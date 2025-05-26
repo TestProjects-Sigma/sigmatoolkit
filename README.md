@@ -61,7 +61,43 @@ Sigma's IT Swiss Army Knife - A comprehensive PyQt5-based GUI application design
 ### Dependencies
 - PyQt5==5.15.10
 - python-nmap==0.7.1 (for future advanced port scanning)
-- requests==2.31.0 (for future web-based tests)
+- requests==2.31.0 (for network testing and web requests)
+
+### Optional: Install Speedtest CLI for Accurate Results
+For the most accurate gigabit speed testing, install speedtest CLI:
+
+**Windows:**
+```bash
+# Option 1: Python version (recommended)
+pip install speedtest-cli
+
+# Option 2: Official CLI
+# Download from: https://www.speedtest.net/apps/cli
+
+# Option 3: Package manager
+choco install speedtest
+```
+
+**Linux:**
+```bash
+# Option 1: Python version
+sudo apt install speedtest-cli
+# or
+pip install speedtest-cli
+
+# Option 2: Official Ookla CLI
+curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | sudo bash
+sudo apt-get install speedtest
+```
+
+**macOS:**
+```bash
+# Option 1: Homebrew
+brew install speedtest-cli
+
+# Option 2: Python version
+pip install speedtest-cli
+```
 
 ## Project Structure
 
@@ -182,35 +218,36 @@ SigmaToolkit/
 
 ### ⚡ Speed Testing Tab
 
-#### Real-time Speed Monitoring
+#### Official Speedtest.net Integration
+- **🚀 Official Speedtest Button**: Uses genuine speedtest.net CLI for maximum accuracy
+- **Automatic CLI Detection**: Intelligently detects official Ookla CLI or Python speedtest-cli
+- **Gigabit-Optimized**: Specifically designed to handle high-speed fiber connections
+- **Real Results**: Same engine as speedtest.net website for trusted measurements
+
+#### Professional Speed Analysis
 - **LCD-Style Displays**: Live readouts for download speed, upload speed, and latency
-- **Progress Tracking**: Real-time progress bars with status updates during tests
+- **Progress Tracking**: Real-time progress bars with detailed status updates
 - **Visual Feedback**: Color-coded displays (green for download, orange for upload, blue for latency)
+- **Quality Assessment**: Automatic performance grading (Excellent/Good/Fair/Poor)
 
-#### Internet Speed Testing
-- **Download Speed Tests**: Measure download bandwidth with configurable test duration
-- **Upload Speed Tests**: Test upload bandwidth using multiple methods
-- **Multiple Test Servers**: Choose from Cloudflare, Google, Microsoft, GitHub, Ubuntu
-- **Custom Servers**: Add your own test endpoints for specialized testing
-- **Test Duration Control**: Configurable test periods (5-60 seconds) for accuracy vs. speed
-
-#### Network Performance Analysis
-- **Latency Testing**: Detailed ping analysis with average, minimum, maximum latency
-- **Jitter Calculation**: Network stability measurement and quality assessment
-- **Quality Grading**: Network performance scoring (Excellent/Good/Fair/Poor)
-- **Comprehensive Testing**: Automated sequence testing latency, download, and upload
-
-#### LAN Testing
-- **Local Network Speed**: Test performance between machines on local network
-- **Device Detection**: Automatically scan and discover local network devices
-- **Custom Port Configuration**: Specify ports for LAN speed testing
-- **Network Topology**: Identify optimal routes for file transfers
+#### Comprehensive Testing Options
+- **🔧 Test CLI**: Manual speedtest CLI testing and debugging
+- **📥 Install CLI**: Step-by-step installation guidance for speedtest tools
+- **List Servers**: Browse available speedtest servers and select optimal locations
+- **Fallback Tests**: Built-in safe testing when CLI is unavailable
 
 #### Advanced Features
-- **Auto Test All**: Automated testing sequence for complete network analysis
-- **Stop Test Function**: Ability to halt tests mid-execution
-- **Results Clearing**: Reset displays and start fresh testing sessions
-- **Test Server Presets**: Quick selection with optimal settings for major providers
+- **Multi-CLI Support**: Works with both official Ookla CLI and Python speedtest-cli versions
+- **Intelligent Server Selection**: Auto-detect best servers or manually choose specific locations
+- **Error Handling**: Detailed troubleshooting and helpful error messages
+- **Installation Helper**: Built-in guidance for Windows, Linux, and macOS CLI setup
+- **Safe Operation**: Timer-based fallback tests that won't crash the application
+
+#### For Gigabit Connections
+- **Accurate High-Speed Testing**: Properly measures 500+ Mbps connections
+- **Fiber-Optimized Protocol**: Uses speedtest.net's proven high-bandwidth testing
+- **Multiple Server Options**: Test with different CDN providers for validation
+- **Real-World Results**: Matches commercial speedtest tools and ISP measurements
 
 #### Quick Test Domains
 - One-click testing of major domains (Google, Microsoft, GitHub)
@@ -360,6 +397,14 @@ Enable debug mode for detailed logging of all operations:
 
 ## Best Practices
 
+### Speed Testing Workflow
+1. **Install speedtest CLI**: Use `pip install speedtest-cli` for accurate results
+2. **Use "🚀 Official Speedtest"**: For real gigabit fiber speed measurements
+3. **Test multiple servers**: Validate results across different server locations
+4. **Check "🔧 Test CLI"**: If official test fails, debug with manual CLI testing
+5. **Built-in tests**: Only use as safe fallbacks - they show simulated lower speeds
+6. **Document baselines**: Record normal speeds for future comparison and troubleshooting
+
 ### Network Performance Troubleshooting Workflow
 1. **Start with latency testing**: Check ping times and jitter to identify connection quality
 2. **Test download speeds**: Measure bandwidth availability for incoming data
@@ -372,6 +417,8 @@ Enable debug mode for detailed logging of all operations:
 - **Start with basic connectivity** (ping) before advanced tests
 - **Use DNS testing** to verify domain configuration before SMTP testing
 - **Test SMTP connectivity** before attempting authentication
+- **Use "🚀 Official Speedtest"** for accurate gigabit speed measurements
+- **Install speedtest CLI** for maximum accuracy: `pip install speedtest-cli`
 - **Baseline network performance** with speed tests for future troubleshooting
 - **Use debug mode** when troubleshooting complex network or email issues
 - **Test with multiple DNS servers** to identify DNS-specific problems
@@ -393,6 +440,7 @@ Enable debug mode for detailed logging of all operations:
 - **SMTP testing**: Only test with accounts you own or have authorization to use
 - **Email sending**: Be responsible when sending test emails to avoid spam complaints
 - **Credentials**: Never use production passwords in testing environments
+- **Speed testing**: Speedtest traffic may be monitored or throttled by some ISPs
 - **Network analysis**: Follow your organization's security policies
 - **Result sharing**: Be cautious when sharing output that may contain sensitive information
 - **Authentication**: Use app-specific passwords when available instead of account passwords
@@ -403,11 +451,33 @@ SigmaToolkit is created for system administrators to enhance their daily workflo
 
 ## Contributing
 
-This tool is designed with modularity in mind. The clean OOP structure makes it easy to:
-- Add new testing tabs
-- Extend existing functionality
-- Integrate with other tools
-- Customize for specific environments
+SigmaToolkit is designed with modularity and extensibility in mind. The clean OOP structure makes it easy to:
+
+### Adding New Features
+- **New testing tabs**: Follow the BaseTab pattern for consistent integration
+- **Extend existing functionality**: Add methods to existing tool classes
+- **Integrate with other tools**: Use the established signal/slot pattern for UI updates
+- **Custom protocols**: Add new network testing protocols following existing patterns
+
+### Code Structure
+- **BaseTab class**: Inherit from this for all new testing tabs
+- **Tool classes**: Separate business logic from UI components
+- **Signal-based communication**: Use PyQt signals for thread-safe UI updates
+- **Modular design**: Each testing category is self-contained and independent
+
+### Development Guidelines
+- **Follow PEP 8**: Python style guidelines for consistent code
+- **Error handling**: Comprehensive try-catch blocks with user-friendly messages
+- **Threading safety**: Use QTimer or proper signal/slot patterns for UI updates
+- **Cross-platform**: Test on Windows, Linux, and macOS when possible
+- **Documentation**: Update README.md with new features and version changes
+
+### Future Enhancement Ideas
+- **Mail header analyzer**: Parse and analyze email delivery paths
+- **SSH terminal integration**: Built-in secure shell connectivity
+- **System monitoring**: CPU, memory, and disk usage monitoring
+- **Certificate analysis**: SSL/TLS certificate validation and inspection
+- **Packet capture**: Basic network packet analysis capabilities
 
 ## Support
 
