@@ -1,4 +1,4 @@
-# ui/main_window.py - UPDATED FOR v1.2.0
+# ui/main_window.py - UPDATED VERSION
 from PyQt5.QtWidgets import (QMainWindow, QTabWidget, QVBoxLayout, 
                             QWidget, QMenuBar, QAction, QMessageBox,
                             QSplitter, QTextEdit, QHBoxLayout, QPushButton,
@@ -6,20 +6,19 @@ from PyQt5.QtWidgets import (QMainWindow, QTabWidget, QVBoxLayout,
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont
 from network.network_tab import NetworkTab
-from dns.dns_tab import DNSTab
-from smtp.smtp_tab import SMTPTab  # Import the new SMTP tab
+from dns.dns_tab import DNSTab  # Import the new DNS tab
 from core.logger import Logger
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.version = "1.2.0"  # Updated version for SMTP features
+        self.version = "1.1.0"  # Updated version
         self.logger = Logger()
         self.init_ui()
         
     def init_ui(self):
-        self.setWindowTitle(f"SigmaToolkit v{self.version}")
-        self.setGeometry(100, 100, 1300, 900)  # Slightly larger for SMTP tab
+        self.setWindowTitle(f"Sigma's IT Toolkit v{self.version}")
+        self.setGeometry(100, 100, 1200, 800)
         
         # Create central widget
         central_widget = QWidget()
@@ -41,10 +40,6 @@ class MainWindow(QMainWindow):
         # Add DNS tab
         self.dns_tab = DNSTab(self.logger)
         self.tab_widget.addTab(self.dns_tab, "🔍 DNS Testing")
-        
-        # Add SMTP tab
-        self.smtp_tab = SMTPTab(self.logger)
-        self.tab_widget.addTab(self.smtp_tab, "📧 SMTP Testing")
         
         # Create output section
         output_widget = QWidget()
@@ -80,7 +75,7 @@ class MainWindow(QMainWindow):
         # Add to splitter
         splitter.addWidget(self.tab_widget)
         splitter.addWidget(output_widget)
-        splitter.setSizes([600, 300])  # Give more space to tabs
+        splitter.setSizes([500, 300])
         
         main_layout.addWidget(splitter)
         
@@ -138,18 +133,14 @@ class MainWindow(QMainWindow):
         self.logger.log(f"Debug mode {status}", "INFO")
         
     def show_about(self):
-        QMessageBox.about(self, "About SigmaToolkit", 
-                         f"SigmaToolkit v{self.version}\\n\\n"
-                         "Sigma's IT Swiss Army Knife\\n"
+        QMessageBox.about(self, "About Sigma's IT Toolkit", 
+                         f"Sigma's IT Toolkit v{self.version}\\n\\n"
                          "A comprehensive tool for system administrators\\n"
-                         "to perform network and email diagnostics.\\n\\n"
+                         "to perform network diagnostics and troubleshooting.\\n\\n"
                          "Features:\\n"
                          "• Network Testing (Ping, Traceroute, Port Scan)\\n"
                          "• DNS Testing (Forward/Reverse, MX, SPF, TXT, NS, CNAME, AAAA)\\n"
-                         "• SMTP Testing (Connection, Auth, Email Sending, MX Validation)\\n"
-                         "• Debug logging and easy result copying\\n\\n"
-                         "Version History:\\n"
-                         "v1.2.0 - Added comprehensive SMTP testing\\n"
-                         "v1.1.0 - Added DNS testing capabilities\\n"
-                         "v1.0.0 - Initial release with network tools\\n\\n"
+                         "• Debug logging\\n"
+                         "• Easy result copying\\n\\n"
+                         "v1.1.0 - Added comprehensive DNS testing tab\\n"
                          "Created for efficient IT troubleshooting workflows.")
