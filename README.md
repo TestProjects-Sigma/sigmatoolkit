@@ -88,6 +88,10 @@ SigmaToolkit/
 │   ├── __init__.py
 │   ├── smtp_tab.py       # SMTP testing UI
 │   └── smtp_tools.py     # SMTP testing logic
+├── speedtest/
+│   ├── __init__.py
+│   ├── speedtest_tab.py    # Speed testing UI
+│   └── speedtest_tools.py  # Speed testing logic
 └── ui/
     ├── __init__.py
     └── main_window.py     # Main application window
@@ -176,6 +180,38 @@ SigmaToolkit/
 - **Comprehensive Testing**: All-in-one SMTP analysis with sequential tests
 - **Auto-fill Features**: Smart form completion based on email addresses
 
+### ⚡ Speed Testing Tab
+
+#### Real-time Speed Monitoring
+- **LCD-Style Displays**: Live readouts for download speed, upload speed, and latency
+- **Progress Tracking**: Real-time progress bars with status updates during tests
+- **Visual Feedback**: Color-coded displays (green for download, orange for upload, blue for latency)
+
+#### Internet Speed Testing
+- **Download Speed Tests**: Measure download bandwidth with configurable test duration
+- **Upload Speed Tests**: Test upload bandwidth using multiple methods
+- **Multiple Test Servers**: Choose from Cloudflare, Google, Microsoft, GitHub, Ubuntu
+- **Custom Servers**: Add your own test endpoints for specialized testing
+- **Test Duration Control**: Configurable test periods (5-60 seconds) for accuracy vs. speed
+
+#### Network Performance Analysis
+- **Latency Testing**: Detailed ping analysis with average, minimum, maximum latency
+- **Jitter Calculation**: Network stability measurement and quality assessment
+- **Quality Grading**: Network performance scoring (Excellent/Good/Fair/Poor)
+- **Comprehensive Testing**: Automated sequence testing latency, download, and upload
+
+#### LAN Testing
+- **Local Network Speed**: Test performance between machines on local network
+- **Device Detection**: Automatically scan and discover local network devices
+- **Custom Port Configuration**: Specify ports for LAN speed testing
+- **Network Topology**: Identify optimal routes for file transfers
+
+#### Advanced Features
+- **Auto Test All**: Automated testing sequence for complete network analysis
+- **Stop Test Function**: Ability to halt tests mid-execution
+- **Results Clearing**: Reset displays and start fresh testing sessions
+- **Test Server Presets**: Quick selection with optimal settings for major providers
+
 #### Quick Test Domains
 - One-click testing of major domains (Google, Microsoft, GitHub)
 - Local domain detection and testing
@@ -204,7 +240,18 @@ Configuration includes:
 
 ## Version History
 
-### v1.2.0 (Current) - SMTP Email Testing
+### v1.3.0 (Current) - Network Performance & Speed Testing
+- **NEW**: Comprehensive speed testing tab with real-time visual displays
+- Internet speed testing with download/upload bandwidth measurement
+- Latency analysis with jitter calculation and quality assessment
+- LAN speed testing for local network performance analysis
+- Multiple test server options (Cloudflare, Google, Microsoft, GitHub, Ubuntu)
+- Real-time LCD-style speed displays with color-coded feedback
+- Progress monitoring with configurable test durations
+- Network device detection and auto-discovery features
+- Comprehensive testing workflows for complete network analysis
+
+### v1.2.0 - SMTP Email Testing
 - **NEW**: Comprehensive SMTP testing tab with full email server analysis
 - SMTP server connection testing with TLS/SSL support
 - Email authentication verification with detailed error reporting
@@ -230,12 +277,6 @@ Configuration includes:
 
 ## Planned Enhancements
 
-### v1.3.0 - Network Performance & Speed Testing
-- Internal LAN speed testing between local machines
-- Internet speed testing (download/upload to external servers)
-- Network latency and jitter analysis
-- Bandwidth utilization monitoring and reporting
-
 ### v1.4.0 - Email Analysis & Security
 - Mail header analyzer for delivery path troubleshooting
 - Advanced SPF/DKIM/DMARC validation and reporting
@@ -248,11 +289,11 @@ Configuration includes:
 - Remote command execution and automation
 - Secure file transfer capabilities (SCP/SFTP)
 
-### v2.0.0 - Advanced Network Analysis
-- Basic packet capture and protocol analysis
-- Network traffic visualization and monitoring
-- Security scanning and vulnerability assessment
-- Advanced network topology discovery
+### v2.0.0 - System Monitoring & Advanced Analysis
+- CPU, memory, and disk usage monitoring
+- System performance diagnostics and alerting
+- Advanced packet capture and protocol analysis
+- Network security scanning and vulnerability assessment
 
 ## Troubleshooting
 
@@ -291,10 +332,18 @@ Configuration includes:
    - Use debug mode to monitor scanning progress
    - Consider smaller ranges or specific ports for faster results
 
-7. **Permission errors**:
-   - Some network tools may require elevated privileges
-   - Run as administrator (Windows) or with sudo (Linux/macOS) if needed
-   - ICMP ping may require root privileges on some systems
+8. **Speed test inaccuracies**:
+   - Close all other applications using internet bandwidth
+   - Ensure no background downloads, updates, or streaming are running
+   - Use longer test durations (30-60 seconds) for more accurate results
+   - Test with multiple servers to identify potential server-side limitations
+   - Check if antivirus or firewall is interfering with tests
+   - For gigabit connections, try custom servers closer to your location
+
+10. **Permission errors**:
+    - Some network tools may require elevated privileges
+    - Run as administrator (Windows) or with sudo (Linux/macOS) if needed
+    - ICMP ping may require root privileges on some systems
 
 ### Debug Mode
 Enable debug mode for detailed logging of all operations:
@@ -311,10 +360,19 @@ Enable debug mode for detailed logging of all operations:
 
 ## Best Practices
 
+### Network Performance Troubleshooting Workflow
+1. **Start with latency testing**: Check ping times and jitter to identify connection quality
+2. **Test download speeds**: Measure bandwidth availability for incoming data
+3. **Test upload speeds**: Verify outbound bandwidth capabilities
+4. **Use comprehensive tests**: For complete network performance analysis
+5. **Compare multiple servers**: Identify if issues are server-specific or general
+6. **Document baseline performance**: Establish normal speeds for comparison
+
 ### For System Administrators
 - **Start with basic connectivity** (ping) before advanced tests
 - **Use DNS testing** to verify domain configuration before SMTP testing
 - **Test SMTP connectivity** before attempting authentication
+- **Baseline network performance** with speed tests for future troubleshooting
 - **Use debug mode** when troubleshooting complex network or email issues
 - **Test with multiple DNS servers** to identify DNS-specific problems
 - **Verify MX records** before testing SMTP servers
@@ -361,6 +419,6 @@ For issues, feature requests, or troubleshooting:
 
 ---
 
-**SigmaToolkit v1.2.0** - Your comprehensive IT Swiss Army knife for efficient network, DNS, and email troubleshooting.
+**SigmaToolkit v1.3.0** - Your comprehensive IT Swiss Army knife for efficient network, DNS, email, and performance troubleshooting.
 
 *Built by system administrators, for system administrators.*

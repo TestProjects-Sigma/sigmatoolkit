@@ -1,4 +1,4 @@
-# ui/main_window.py - UPDATED FOR v1.2.0
+# ui/main_window.py - UPDATED FOR v1.3.0
 from PyQt5.QtWidgets import (QMainWindow, QTabWidget, QVBoxLayout, 
                             QWidget, QMenuBar, QAction, QMessageBox,
                             QSplitter, QTextEdit, QHBoxLayout, QPushButton,
@@ -7,19 +7,20 @@ from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont
 from network.network_tab import NetworkTab
 from dns.dns_tab import DNSTab
-from smtp.smtp_tab import SMTPTab  # Import the new SMTP tab
+from smtp.smtp_tab import SMTPTab
+from speedtest.speedtest_tab import SpeedTestTab  # Import the new Speedtest tab
 from core.logger import Logger
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.version = "1.2.0"  # Updated version for SMTP features
+        self.version = "1.3.0"  # Updated version for Speedtest features
         self.logger = Logger()
         self.init_ui()
         
     def init_ui(self):
         self.setWindowTitle(f"SigmaToolkit v{self.version}")
-        self.setGeometry(100, 100, 1300, 900)  # Slightly larger for SMTP tab
+        self.setGeometry(100, 100, 1400, 950)  # Larger for speedtest displays
         
         # Create central widget
         central_widget = QWidget()
@@ -45,6 +46,10 @@ class MainWindow(QMainWindow):
         # Add SMTP tab
         self.smtp_tab = SMTPTab(self.logger)
         self.tab_widget.addTab(self.smtp_tab, "📧 SMTP Testing")
+        
+        # Add Speedtest tab
+        self.speedtest_tab = SpeedTestTab(self.logger)
+        self.tab_widget.addTab(self.speedtest_tab, "⚡ Speed Testing")
         
         # Create output section
         output_widget = QWidget()
@@ -80,7 +85,7 @@ class MainWindow(QMainWindow):
         # Add to splitter
         splitter.addWidget(self.tab_widget)
         splitter.addWidget(output_widget)
-        splitter.setSizes([600, 300])  # Give more space to tabs
+        splitter.setSizes([650, 300])  # More space for speedtest visuals
         
         main_layout.addWidget(splitter)
         
@@ -142,14 +147,16 @@ class MainWindow(QMainWindow):
                          f"SigmaToolkit v{self.version}\\n\\n"
                          "Sigma's IT Swiss Army Knife\\n"
                          "A comprehensive tool for system administrators\\n"
-                         "to perform network and email diagnostics.\\n\\n"
+                         "to perform network, DNS, email, and speed diagnostics.\\n\\n"
                          "Features:\\n"
                          "• Network Testing (Ping, Traceroute, Port Scan)\\n"
                          "• DNS Testing (Forward/Reverse, MX, SPF, TXT, NS, CNAME, AAAA)\\n"
                          "• SMTP Testing (Connection, Auth, Email Sending, MX Validation)\\n"
+                         "• Speed Testing (Internet, LAN, Latency, Real-time Monitoring)\\n"
                          "• Debug logging and easy result copying\\n\\n"
                          "Version History:\\n"
-                         "v1.2.0 - Added comprehensive SMTP testing\\n"
+                         "v1.3.0 - Added comprehensive speed testing with real-time displays\\n"
+                         "v1.2.0 - Added SMTP testing capabilities\\n"
                          "v1.1.0 - Added DNS testing capabilities\\n"
                          "v1.0.0 - Initial release with network tools\\n\\n"
                          "Created for efficient IT troubleshooting workflows.")

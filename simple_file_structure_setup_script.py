@@ -44,10 +44,15 @@ def create_project_structure():
         "dns/dns_tab.py",
         "dns/dns_tools.py",
         
-        # SMTP folder and files (NEW in v1.2.0)
+        # SMTP folder and files
         "smtp/__init__.py",
         "smtp/smtp_tab.py",
         "smtp/smtp_tools.py",
+        
+        # Speedtest folder and files (NEW in v1.3.0)
+        "speedtest/__init__.py",
+        "speedtest/speedtest_tab.py",
+        "speedtest/speedtest_tools.py",
         
         # UI folder and files
         "ui/__init__.py",
@@ -99,6 +104,10 @@ def create_project_structure():
     print("│   ├── __init__.py")
     print("│   ├── smtp_tab.py")
     print("│   └── smtp_tools.py")
+    print("├── speedtest/")
+    print("│   ├── __init__.py")
+    print("│   ├── speedtest_tab.py")
+    print("│   └── speedtest_tools.py")
     print("└── ui/")
     print("    ├── __init__.py")
     print("    └── main_window.py")
