@@ -1,26 +1,36 @@
-# ui/main_window.py - UPDATED FOR v1.3.0
+# ui/main_window.py - COMPLETE FIX TO AVOID IMPORT ERROR
 from PyQt5.QtWidgets import (QMainWindow, QTabWidget, QVBoxLayout, 
                             QWidget, QMenuBar, QAction, QMessageBox,
                             QSplitter, QTextEdit, QHBoxLayout, QPushButton,
-                            QApplication, QLabel)  # Added QLabel here
+                            QApplication, QLabel, QFileDialog)
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont
+from datetime import datetime
 from network.network_tab import NetworkTab
 from dns.dns_tab import DNSTab
 from smtp.smtp_tab import SMTPTab
-from speedtest.speedtest_tab import SpeedTestTab  # Import the new Speedtest tab
+from speedtest.speedtest_tab import SpeedTestTab
+
+# Try to import the mail tab, but handle gracefully if not available
+try:
+    from mail.mail_tab import MailTab
+    MAIL_TAB_AVAILABLE = True
+except ImportError:
+    MAIL_TAB_AVAILABLE = False
+    print("⚠️ Mail tab not available - run setup script first")
+
 from core.logger import Logger
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.version = "1.3.0"  # Updated version for Speedtest features
+        self.version = "1.4.0" if MAIL_TAB_AVAILABLE else "1.3.0"
         self.logger = Logger()
         self.init_ui()
         
     def init_ui(self):
         self.setWindowTitle(f"SigmaToolkit v{self.version}")
-        self.setGeometry(100, 100, 1500, 1000)  # Larger window for better layout
+        self.setGeometry(100, 100, 1600, 1000)
         
         # Create central widget
         central_widget = QWidget()
@@ -30,7 +40,7 @@ class MainWindow(QMainWindow):
         main_layout = QVBoxLayout(central_widget)
         
         # Create splitter for tabs and output (horizontal split)
-        splitter = QSplitter(Qt.Horizontal)  # Changed to horizontal
+        splitter = QSplitter(Qt.Horizontal)
         
         # Create tab widget
         self.tab_widget = QTabWidget()
@@ -50,6 +60,11 @@ class MainWindow(QMainWindow):
         # Add Speedtest tab
         self.speedtest_tab = SpeedTestTab(self.logger)
         self.tab_widget.addTab(self.speedtest_tab, "⚡ Speed Testing")
+        
+        # Add Mail Header Analysis tab (if available)
+        if MAIL_TAB_AVAILABLE:
+            self.mail_tab = MailTab(self.logger)
+            self.tab_widget.addTab(self.mail_tab, "📨 Mail Analysis")
         
         # Create output section with larger, better layout
         output_widget = QWidget()
@@ -100,9 +115,9 @@ class MainWindow(QMainWindow):
         
         # Output text area - much larger and better styled
         self.output_text = QTextEdit()
-        self.output_text.setFont(QFont("Consolas", 11))  # Slightly larger font
+        self.output_text.setFont(QFont("Consolas", 11))
         self.output_text.setReadOnly(True)
-        self.output_text.setMinimumWidth(500)  # Minimum width
+        self.output_text.setMinimumWidth(500)
         self.output_text.setStyleSheet("""
             QTextEdit {
                 background-color: #1e1e1e;
@@ -130,15 +145,15 @@ class MainWindow(QMainWindow):
         output_layout.addLayout(controls_layout)
         output_layout.addWidget(self.output_text)
         
-        # Add to splitter with much larger output area
+        # Add to splitter
         splitter.addWidget(self.tab_widget)
         splitter.addWidget(output_widget)
-        splitter.setSizes([800, 700])  # 53% tabs, 47% output - Much larger output!
+        splitter.setSizes([900, 700])
         
         # Make the splitter movable and set minimum sizes
-        splitter.setChildrenCollapsible(False)  # Prevent collapsing
-        self.tab_widget.setMinimumWidth(600)     # Minimum tab area
-        output_widget.setMinimumWidth(400)       # Minimum output area
+        splitter.setChildrenCollapsible(False)
+        self.tab_widget.setMinimumWidth(650)
+        output_widget.setMinimumWidth(400)
         
         main_layout.addWidget(splitter)
         
@@ -150,6 +165,28 @@ class MainWindow(QMainWindow):
         
         # Connect logger to output
         self.logger.message_logged.connect(self.append_output)
+        
+        # Show welcome message
+        self.show_welcome_message()
+        
+    def show_welcome_message(self):
+        """Show welcome message"""
+        QTimer.singleShot(1000, self._delayed_welcome)
+        
+    def _delayed_welcome(self):
+        """Delayed welcome message"""
+        self.logger.info(f"🎉 Welcome to SigmaToolkit v{self.version}!")
+        
+        if MAIL_TAB_AVAILABLE:
+            self.logger.info("✨ NEW: Mail Header Analysis tab with comprehensive email diagnostics")
+            self.logger.info("📨 Analyze email headers, SPF/DKIM/DMARC, delivery paths, and spam indicators")
+            self.logger.info("🔍 Complete toolkit: Network → DNS → SMTP → Speed → Mail Analysis")
+        else:
+            self.logger.warning("📨 Mail Analysis tab not available")
+            self.logger.info("💡 To enable: Run the mail module setup script")
+            self.logger.info("🔍 Current toolkit: Network → DNS → SMTP → Speed Testing")
+            
+        self.logger.info("💡 Ready for advanced troubleshooting workflows!")
         
     def setup_connections(self):
         self.clear_btn.clicked.connect(self.clear_output)
@@ -167,12 +204,30 @@ class MainWindow(QMainWindow):
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
         
+        # Tools menu
+        tools_menu = menubar.addMenu('Tools')
+        
+        if MAIL_TAB_AVAILABLE:
+            mail_analysis_action = QAction('Mail Header Analysis', self)
+            mail_analysis_action.triggered.connect(lambda: self.tab_widget.setCurrentIndex(4))
+            tools_menu.addAction(mail_analysis_action)
+            tools_menu.addSeparator()
+        
+        export_all_action = QAction('Export All Results', self)
+        export_all_action.triggered.connect(self.export_all_results)
+        tools_menu.addAction(export_all_action)
+        
         # Help menu
         help_menu = menubar.addMenu('Help')
         
         about_action = QAction('About', self)
         about_action.triggered.connect(self.show_about)
         help_menu.addAction(about_action)
+        
+        if MAIL_TAB_AVAILABLE:
+            mail_help_action = QAction('Mail Analysis Help', self)
+            mail_help_action.triggered.connect(self.show_mail_help)
+            help_menu.addAction(mail_help_action)
         
     def append_output(self, message):
         self.output_text.append(message)
@@ -195,21 +250,107 @@ class MainWindow(QMainWindow):
         status = "enabled" if enabled else "disabled"
         self.logger.log(f"Debug mode {status}", "INFO")
         
+    def export_all_results(self):
+        """Export all results from all tabs"""
+        try:
+            file_path, _ = QFileDialog.getSaveFileName(
+                self, 
+                "Export All Results", 
+                f"sigmatoolkit_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt", 
+                "Text Files (*.txt);;All Files (*)"
+            )
+            
+            if file_path:
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(f"SigmaToolkit v{self.version} - Complete Results Export\n")
+                    f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                    f.write("=" * 60 + "\n\n")
+                    
+                    # Export output log
+                    f.write("CONSOLE OUTPUT:\n")
+                    f.write("-" * 20 + "\n")
+                    f.write(self.output_text.toPlainText())
+                    f.write("\n\n")
+                    
+                self.logger.success(f"All results exported to: {file_path}")
+                
+        except Exception as e:
+            self.logger.error(f"Export failed: {str(e)}")
+        
     def show_about(self):
+        features_text = """• Network Testing (Ping, Traceroute, Port Scan)
+• DNS Testing (Forward/Reverse, MX, SPF, TXT, NS, CNAME, AAAA)
+• SMTP Testing (Connection, Auth, Email Sending, MX Validation)
+• Speed Testing (Internet, LAN, Latency, Real-time Monitoring)"""
+
+        if MAIL_TAB_AVAILABLE:
+            features_text += """
+• Mail Analysis (Header Analysis, SPF/DKIM/DMARC, Delivery Path, Spam Detection)"""
+
+        features_text += """
+• Debug logging and easy result copying"""
+
+        version_history = """v1.3.0 - Added comprehensive speed testing with real-time displays
+v1.2.0 - Added SMTP testing capabilities
+v1.1.0 - Added DNS testing capabilities
+v1.0.0 - Initial release with network tools"""
+
+        if MAIL_TAB_AVAILABLE:
+            version_history = f"v1.4.0 - Added comprehensive mail header analysis and email authentication\n{version_history}"
+
         QMessageBox.about(self, "About SigmaToolkit", 
-                         f"SigmaToolkit v{self.version}\\n\\n"
-                         "Sigma's IT Swiss Army Knife\\n"
-                         "A comprehensive tool for system administrators\\n"
-                         "to perform network, DNS, email, and speed diagnostics.\\n\\n"
-                         "Features:\\n"
-                         "• Network Testing (Ping, Traceroute, Port Scan)\\n"
-                         "• DNS Testing (Forward/Reverse, MX, SPF, TXT, NS, CNAME, AAAA)\\n"
-                         "• SMTP Testing (Connection, Auth, Email Sending, MX Validation)\\n"
-                         "• Speed Testing (Internet, LAN, Latency, Real-time Monitoring)\\n"
-                         "• Debug logging and easy result copying\\n\\n"
-                         "Version History:\\n"
-                         "v1.3.0 - Added comprehensive speed testing with real-time displays\\n"
-                         "v1.2.0 - Added SMTP testing capabilities\\n"
-                         "v1.1.0 - Added DNS testing capabilities\\n"
-                         "v1.0.0 - Initial release with network tools\\n\\n"
+                         f"SigmaToolkit v{self.version}\n\n"
+                         "Sigma's IT Swiss Army Knife\n"
+                         "A comprehensive tool for system administrators\n"
+                         "to perform network, DNS, email, speed, and mail diagnostics.\n\n"
+                         f"Features:\n{features_text}\n\n"
+                         f"Version History:\n{version_history}\n\n"
                          "Created for efficient IT troubleshooting workflows.")
+    
+    def show_mail_help(self):
+        """Show help for mail analysis features"""
+        if not MAIL_TAB_AVAILABLE:
+            QMessageBox.information(self, "Mail Analysis Not Available", 
+                                  "The Mail Header Analysis feature is not currently available.\n\n"
+                                  "To enable this feature:\n"
+                                  "1. Run the mail module setup script\n"
+                                  "2. Restart SigmaToolkit\n\n"
+                                  "The setup script will create the necessary mail analysis modules.")
+            return
+            
+        help_text = """📨 MAIL HEADER ANALYSIS HELP
+
+The Mail Analysis tab provides comprehensive email diagnostics:
+
+📧 HEADER ANALYSIS:
+• Paste email headers from 'View Source' or 'Show Original'
+• Analyzes delivery path, authentication, and security
+• Identifies potential issues and suspicious patterns
+
+🔐 EMAIL AUTHENTICATION:
+• SPF: Validates sending IP against DNS records
+• DKIM: Checks cryptographic signatures for integrity
+• DMARC: Analyzes domain policies for handling failures
+
+🛤️ DELIVERY PATH:
+• Traces email route through servers
+• Calculates delivery delays and identifies bottlenecks
+• Detects potential mail loops or routing issues
+
+🛡️ SPAM ANALYSIS:
+• IP reputation checking
+• Content pattern analysis
+• Blacklist verification
+
+💡 TIPS:
+• Use 'Load Sample' to test with example headers
+• Enable all checkboxes for comprehensive analysis
+• Export results for documentation and reports
+• Combine with SMTP testing for complete email diagnostics"""
+        
+        msg = QMessageBox()
+        msg.setWindowTitle("Mail Analysis Help")
+        msg.setText("Mail Header Analysis Help")
+        msg.setDetailedText(help_text)
+        msg.setIcon(QMessageBox.Information)
+        msg.exec_()
