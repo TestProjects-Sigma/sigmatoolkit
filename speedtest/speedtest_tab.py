@@ -1,4 +1,4 @@
-# speedtest/speedtest_tab.py
+# speedtest/speedtest_tab.py - UPDATED WITH ADVANCED LAN TESTING
 import os
 import socket
 import threading
@@ -11,10 +11,22 @@ from PyQt5.QtGui import QFont, QPalette
 from core.base_tab import BaseTab
 from speedtest.speedtest_tools import SpeedTestTools
 
+# Import the new LAN testing tools
+try:
+    from speedtest.lan_speed_tools import LANSpeedTools
+    LAN_TOOLS_AVAILABLE = True
+except ImportError:
+    LAN_TOOLS_AVAILABLE = False
+
 class SpeedTestTab(BaseTab):
     def __init__(self, logger):
         super().__init__(logger)
         self.speedtest_tools = SpeedTestTools(logger)
+        
+        # Initialize LAN testing tools if available
+        if LAN_TOOLS_AVAILABLE:
+            self.lan_tools = LANSpeedTools(logger)
+        
         self.current_download_speed = 0.0
         self.current_upload_speed = 0.0
         self.current_latency = 0.0
@@ -134,8 +146,8 @@ class SpeedTestTab(BaseTab):
         
         layout.addWidget(internet_group)
         
-        # LAN Speed Test Section
-        lan_group = QGroupBox("Local Network (LAN) Speed Test")
+        # Advanced LAN Speed Test Section
+        lan_group = QGroupBox("🏠 Advanced LAN Speed Test")
         lan_layout = QGridLayout(lan_group)
         
         lan_layout.addWidget(QLabel("Target IP:"), 0, 0)
@@ -143,19 +155,50 @@ class SpeedTestTab(BaseTab):
         self.lan_ip_edit.setPlaceholderText("192.168.1.100")
         lan_layout.addWidget(self.lan_ip_edit, 0, 1)
         
-        lan_layout.addWidget(QLabel("Port:"), 0, 2)
+        lan_layout.addWidget(QLabel("Port (optional):"), 0, 2)
         self.lan_port_spin = QSpinBox()
         self.lan_port_spin.setRange(1, 65535)
         self.lan_port_spin.setValue(12345)
         lan_layout.addWidget(self.lan_port_spin, 0, 3)
         
-        self.lan_test_btn = QPushButton("Test LAN Speed")
-        self.detect_devices_btn = QPushButton("Detect Local Devices")
+        # Advanced LAN test buttons
+        if LAN_TOOLS_AVAILABLE:
+            self.advanced_lan_btn = QPushButton("🚀 Advanced LAN Test")
+            self.iperf3_guide_btn = QPushButton("📖 iperf3 Setup Guide")
+            lan_layout.addWidget(self.advanced_lan_btn, 1, 0, 1, 2)
+            lan_layout.addWidget(self.iperf3_guide_btn, 1, 2, 1, 2)
+        else:
+            # Fallback to basic LAN test
+            self.lan_test_btn = QPushButton("Basic LAN Test")
+            lan_layout.addWidget(self.lan_test_btn, 1, 0, 1, 2)
         
-        lan_layout.addWidget(self.lan_test_btn, 1, 0, 1, 2)
-        lan_layout.addWidget(self.detect_devices_btn, 1, 2, 1, 2)
+        self.detect_devices_btn = QPushButton("🔍 Detect Local Devices")
+        self.ping_gateway_btn = QPushButton("📡 Ping Gateway")
+        
+        lan_layout.addWidget(self.detect_devices_btn, 2, 0, 1, 2)
+        lan_layout.addWidget(self.ping_gateway_btn, 2, 2, 1, 2)
         
         layout.addWidget(lan_group)
+        
+        # LAN Testing Guide
+        if LAN_TOOLS_AVAILABLE:
+            guide_group = QGroupBox("🎯 LAN Speed Testing Guide")
+            guide_layout = QVBoxLayout(guide_group)
+            
+            guide_text = QTextEdit()
+            guide_text.setMaximumHeight(100)
+            guide_text.setReadOnly(True)
+            guide_text.setText(
+                "Advanced LAN Testing Methods:\n"
+                "• 🥇 iperf3: Most accurate (requires iperf3 -s on target)\n"
+                "• 🌐 HTTP: Tests web servers (ports 80, 443, 8080)\n"
+                "• 📁 FTP: Tests file servers (port 21)\n"
+                "• 🗂️ SMB: Tests Windows file sharing (ports 445, 139)\n"
+                "• 🔌 Socket: Basic throughput estimation\n"
+                "Best results: Install iperf3 on both devices!"
+            )
+            guide_layout.addWidget(guide_text)
+            layout.addWidget(guide_group)
         
         # Control Buttons Section
         control_group = QGroupBox("Test Controls")
@@ -248,6 +291,29 @@ class SpeedTestTab(BaseTab):
             }
         """
         
+        # LAN test button (advanced style)
+        lan_button_style = """
+            QPushButton {
+                background-color: #8764b8;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-weight: bold;
+                min-height: 35px;
+            }
+            QPushButton:hover {
+                background-color: #7356a1;
+            }
+            QPushButton:pressed {
+                background-color: #5f478a;
+            }
+            QPushButton:disabled {
+                background-color: #cccccc;
+                color: #666666;
+            }
+        """
+        
         # Control buttons
         control_button_style = """
             QPushButton {
@@ -272,12 +338,21 @@ class SpeedTestTab(BaseTab):
         
         # Apply styles
         for btn in [self.latency_btn, self.download_btn, self.upload_btn, 
-                   self.lan_test_btn, self.detect_devices_btn, self.list_servers_btn,
-                   self.test_cli_btn]:
+                   self.list_servers_btn, self.test_cli_btn, self.detect_devices_btn,
+                   self.ping_gateway_btn]:
             btn.setStyleSheet(test_button_style)
-            
+        
         self.official_test_btn.setStyleSheet(comprehensive_button_style)
         self.comprehensive_btn.setStyleSheet(comprehensive_button_style)
+        
+        # LAN testing buttons
+        if LAN_TOOLS_AVAILABLE:
+            self.advanced_lan_btn.setStyleSheet(lan_button_style)
+            self.iperf3_guide_btn.setStyleSheet(test_button_style)
+        else:
+            if hasattr(self, 'lan_test_btn'):
+                self.lan_test_btn.setStyleSheet(test_button_style)
+        
         self.install_cli_btn.setStyleSheet("""
             QPushButton {
                 background-color: #8764b8;
@@ -312,8 +387,21 @@ class SpeedTestTab(BaseTab):
         self.download_btn.clicked.connect(self.test_download)
         self.upload_btn.clicked.connect(self.test_upload)
         self.comprehensive_btn.clicked.connect(self.comprehensive_test)
-        self.lan_test_btn.clicked.connect(self.test_lan_speed)
+        
+        # LAN testing connections
+        if LAN_TOOLS_AVAILABLE:
+            self.advanced_lan_btn.clicked.connect(self.run_advanced_lan_test)
+            self.iperf3_guide_btn.clicked.connect(self.show_iperf3_guide)
+            # Setup LAN tools connections
+            self.lan_tools.result_ready.connect(self.handle_result)
+            self.lan_tools.progress_update.connect(self.update_progress)
+            self.lan_tools.speed_update.connect(self.update_speed)
+        else:
+            if hasattr(self, 'lan_test_btn'):
+                self.lan_test_btn.clicked.connect(self.test_basic_lan_speed)
+        
         self.detect_devices_btn.clicked.connect(self.detect_local_devices)
+        self.ping_gateway_btn.clicked.connect(self.ping_gateway)
         
         # Control button connections
         self.stop_btn.clicked.connect(self.stop_test)
@@ -325,6 +413,84 @@ class SpeedTestTab(BaseTab):
         self.speedtest_tools.progress_update.connect(self.update_progress)
         self.speedtest_tools.speed_update.connect(self.update_speed)
         
+    def run_advanced_lan_test(self):
+        """Run advanced LAN speed test with multiple methods"""
+        target_ip = self.lan_ip_edit.text().strip()
+        if not target_ip:
+            self.error("Please enter target IP address")
+            return
+        
+        port = self.lan_port_spin.value()
+        
+        self.info(f"🚀 Starting advanced LAN speed test to {target_ip}...")
+        
+        # Reset displays
+        self.current_download_speed = 0.0
+        self.update_speed_displays()
+        
+        self.progress_bar.setValue(0)
+        self.progress_label.setText("Starting advanced LAN test...")
+        self.set_test_buttons_enabled(False)
+        self.stop_btn.setEnabled(True)
+        
+        if LAN_TOOLS_AVAILABLE:
+            self.lan_tools.comprehensive_lan_test(target_ip, port)
+        
+        # Auto re-enable buttons after test
+        QTimer.singleShot(30000, lambda: self.set_test_buttons_enabled(True))
+        QTimer.singleShot(30000, lambda: self.stop_btn.setEnabled(False))
+    
+    def show_iperf3_guide(self):
+        """Show iperf3 installation and setup guide"""
+        if LAN_TOOLS_AVAILABLE:
+            self.info("📖 Showing iperf3 setup guide...")
+            self.lan_tools.install_iperf3_helper()
+        else:
+            self.info("💡 iperf3 is the best tool for LAN speed testing")
+            self.info("Install: pip install iperf3 or download from iperf.fr")
+    
+    def test_basic_lan_speed(self):
+        """Fallback basic LAN speed test"""
+        target_ip = self.lan_ip_edit.text().strip()
+        if not target_ip:
+            self.error("Please enter target IP address")
+            return
+        
+        port = self.lan_port_spin.value()
+        
+        self.info(f"Testing basic LAN connectivity to {target_ip}:{port}...")
+        self.speedtest_tools.lan_speed_test(target_ip, port)
+    
+    def ping_gateway(self):
+        """Ping the default gateway"""
+        import subprocess
+        import platform
+        
+        try:
+            if platform.system().lower() == "windows":
+                result = subprocess.run(["ipconfig"], capture_output=True, text=True)
+                # Extract default gateway from ipconfig output
+                for line in result.stdout.split('\n'):
+                    if 'Default Gateway' in line:
+                        gateway = line.split(':')[-1].strip()
+                        if gateway and gateway != '':
+                            self.lan_ip_edit.setText(gateway)
+                            self.info(f"Found gateway: {gateway}")
+                            self.speedtest_tools.ping_latency_test(gateway, 5)
+                            return
+            else:
+                result = subprocess.run(["ip", "route", "show", "default"], capture_output=True, text=True)
+                if result.returncode == 0:
+                    gateway = result.stdout.split()[2]
+                    self.lan_ip_edit.setText(gateway)
+                    self.info(f"Found gateway: {gateway}")
+                    self.speedtest_tools.ping_latency_test(gateway, 5)
+                    return
+                    
+            self.error("Could not determine default gateway")
+        except Exception as e:
+            self.error(f"Error getting gateway: {str(e)}")
+    
     def on_server_changed(self, text):
         """Handle server selection change"""
         if "Custom" in text:
@@ -394,6 +560,8 @@ class SpeedTestTab(BaseTab):
         elif test_type == "lan":
             # For LAN tests, show as download speed
             self.current_download_speed = speed
+        elif test_type == "latency":
+            self.current_latency = speed
             
         self.update_speed_displays()
     
@@ -405,152 +573,18 @@ class SpeedTestTab(BaseTab):
         self.download_btn.setEnabled(enabled)
         self.upload_btn.setEnabled(enabled)
         self.comprehensive_btn.setEnabled(enabled)
-        self.lan_test_btn.setEnabled(enabled)
+        
+        if LAN_TOOLS_AVAILABLE:
+            self.advanced_lan_btn.setEnabled(enabled)
+        else:
+            if hasattr(self, 'lan_test_btn'):
+                self.lan_test_btn.setEnabled(enabled)
+                
         self.detect_devices_btn.setEnabled(enabled)
+        self.ping_gateway_btn.setEnabled(enabled)
         self.auto_test_btn.setEnabled(enabled)
     
-    def test_cli_manual(self):
-        """Test speedtest CLI manually to debug issues"""
-        import subprocess
-        
-        self.info("🔧 Testing speedtest CLI manually...")
-        
-        def _test_manual():
-            try:
-                # Test version first
-                self.info("1. Testing speedtest-cli version...")
-                result = subprocess.run(["speedtest-cli", "--version"], 
-                                      capture_output=True, text=True, timeout=10)
-                if result.returncode == 0:
-                    self.success(f"✅ Version: {result.stdout.strip()}")
-                else:
-                    self.error(f"❌ Version check failed: {result.stderr}")
-                    return
-                
-                # Test simple run
-                self.info("2. Testing basic speedtest-cli run...")
-                result = subprocess.run(["speedtest-cli", "--simple"], 
-                                      capture_output=True, text=True, timeout=60)
-                if result.returncode == 0:
-                    self.success("✅ Basic test successful:")
-                    for line in result.stdout.strip().split('\n'):
-                        self.info(f"   {line}")
-                else:
-                    self.error(f"❌ Basic test failed: {result.stderr}")
-                    return
-                
-                # Test JSON output
-                self.info("3. Testing JSON output...")
-                result = subprocess.run(["speedtest-cli", "--json"], 
-                                      capture_output=True, text=True, timeout=60)
-                if result.returncode == 0:
-                    self.success("✅ JSON test successful")
-                    self.info(f"JSON length: {len(result.stdout)} characters")
-                    self.info(f"First 200 chars: {result.stdout[:200]}")
-                    
-                    # Try to parse
-                    try:
-                        import json
-                        data = json.loads(result.stdout)
-                        self.success("✅ JSON parsing successful")
-                        self.info(f"Download: {data.get('download', 'N/A')} bps")
-                        self.info(f"Upload: {data.get('upload', 'N/A')} bps")
-                        self.info(f"Ping: {data.get('ping', 'N/A')} ms")
-                    except Exception as e:
-                        self.error(f"❌ JSON parsing failed: {str(e)}")
-                else:
-                    self.error(f"❌ JSON test failed: {result.stderr}")
-                
-            except FileNotFoundError:
-                self.error("❌ speedtest-cli not found in PATH")
-                self.warning("Try: pip install speedtest-cli")
-            except subprocess.TimeoutExpired:
-                self.error("⏱️ speedtest-cli timed out")
-            except Exception as e:
-                self.error(f"❌ Manual test error: {str(e)}")
-        
-        import threading
-        thread = threading.Thread(target=_test_manual)
-        thread.daemon = True
-        thread.start()
-    
-    def show_install_instructions(self):
-        """Show speedtest CLI installation instructions"""
-        from PyQt5.QtWidgets import QMessageBox
-        import platform
-        
-        system = platform.system().lower()
-        
-        if system == "windows":
-            instructions = """🪟 Windows Installation Options:
-
-Option 1: Official CLI (Recommended)
-1. Go to: https://www.speedtest.net/apps/cli
-2. Download Windows version
-3. Extract to C:\\speedtest\\
-4. Add to PATH in Environment Variables
-
-Option 2: Python Version
-• pip install speedtest-cli
-
-Option 3: Package Manager
-• choco install speedtest
-• scoop install speedtest
-
-After installation, restart SigmaToolkit."""
-            
-        elif system == "linux":
-            instructions = """🐧 Linux Installation Options:
-
-Option 1: Official CLI
-• curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | sudo bash
-• sudo apt-get install speedtest
-
-Option 2: Python Version
-• sudo apt install speedtest-cli
-• pip install speedtest-cli
-
-Option 3: Other Distros
-• sudo dnf install speedtest-cli (Fedora)
-• sudo pacman -S speedtest-cli (Arch)
-
-After installation, restart SigmaToolkit."""
-            
-        elif system == "darwin":
-            instructions = """🍎 macOS Installation Options:
-
-Option 1: Homebrew (Recommended)
-• brew install speedtest-cli
-
-Option 2: Python Version
-• pip install speedtest-cli
-
-Option 3: Manual Download
-1. Download from: https://www.speedtest.net/apps/cli
-2. Extract to /usr/local/bin/
-3. chmod +x /usr/local/bin/speedtest
-
-After installation, restart SigmaToolkit."""
-        else:
-            instructions = """📥 General Installation:
-
-Use Python pip (cross-platform):
-• pip install speedtest-cli
-
-Or download from:
-• https://www.speedtest.net/apps/cli
-
-After installation, restart SigmaToolkit."""
-        
-        msg = QMessageBox()
-        msg.setWindowTitle("Install Speedtest CLI")
-        msg.setText("Install Speedtest CLI for accurate gigabit testing:")
-        msg.setDetailedText(instructions)
-        msg.setIcon(QMessageBox.Information)
-        msg.exec_()
-        
-        self.info("📥 Installation instructions shown. Restart SigmaToolkit after installing.")
-    
+    # Keep all the existing methods from the original file...
     def run_official_speedtest(self):
         """Run official speedtest.net CLI test"""
         self.info("🚀 Starting official Speedtest.net test...")
@@ -571,6 +605,14 @@ After installation, restart SigmaToolkit."""
         # Auto re-enable buttons after test
         QTimer.singleShot(45000, lambda: self.set_test_buttons_enabled(True))
         QTimer.singleShot(45000, lambda: self.stop_btn.setEnabled(False))
+    
+    def test_cli_manual(self):
+        """Test speedtest CLI manually to debug issues"""
+        self.speedtest_tools.test_cli_manual()
+    
+    def show_install_instructions(self):
+        """Show speedtest CLI installation instructions"""
+        self.speedtest_tools.show_install_instructions()
     
     def list_servers(self):
         """List available speedtest servers"""
@@ -594,120 +636,12 @@ After installation, restart SigmaToolkit."""
         QTimer.singleShot(15000, lambda: self.stop_btn.setEnabled(False))
     
     def test_download(self):
-        """Test download speed using built-in method (simplified and safer)"""
-        import time  # Import here to ensure it's available
-        
-        server = self.get_selected_server()
-        
-        self.info(f"Starting built-in download test from {server['host']}...")
-        self.current_download_speed = 0.0
-        self.update_speed_displays()
-        
-        self.progress_bar.setValue(0)
-        self.progress_label.setText("Testing download speed (built-in)...")
-        self.set_test_buttons_enabled(False)
-        self.stop_btn.setEnabled(True)
-        
-        # Simple timer-based simulation to avoid threading issues
-        self.download_timer = QTimer()
-        self.download_start_time = time.time()
-        self.download_duration = 15
-        self.download_base_speed = 50  # Conservative built-in speed
-        
-        def update_download():
-            import time  # Import in nested function too
-            try:
-                elapsed = time.time() - self.download_start_time
-                if elapsed >= self.download_duration:
-                    # Test completed
-                    self.download_timer.stop()
-                    self.success(f"Built-in download test: {self.download_base_speed:.1f} Mbps")
-                    self.warning("For accurate gigabit speeds, use '🚀 Official Speedtest'")
-                    self.progress_bar.setValue(100)
-                    self.progress_label.setText("Download test completed")
-                    self.set_test_buttons_enabled(True)
-                    self.stop_btn.setEnabled(False)
-                    return
-                
-                # Update progress and speed
-                progress = int((elapsed / self.download_duration) * 100)
-                
-                # Simulate realistic speed variation
-                import random
-                variation = random.uniform(-10, 10)
-                current_speed = max(10, self.download_base_speed + variation)
-                
-                self.current_download_speed = current_speed
-                self.update_speed_displays()
-                self.progress_bar.setValue(progress)
-                self.progress_label.setText(f"Download: {current_speed:.1f} Mbps (built-in)")
-                
-            except Exception as e:
-                self.download_timer.stop()
-                self.error(f"Download test error: {str(e)}")
-                self.set_test_buttons_enabled(True)
-                self.stop_btn.setEnabled(False)
-        
-        self.download_timer.timeout.connect(update_download)
-        self.download_timer.start(200)  # Update every 200ms
+        """Test download speed using built-in method"""
+        self.speedtest_tools.test_download()
     
     def test_upload(self):
-        """Test upload speed using built-in method (simplified and safer)"""
-        import time  # Import here to ensure it's available
-        
-        server = self.get_selected_server()
-        
-        self.info(f"Starting built-in upload test to {server['host']}...")
-        self.current_upload_speed = 0.0
-        self.update_speed_displays()
-        
-        self.progress_bar.setValue(0)
-        self.progress_label.setText("Testing upload speed (built-in)...")
-        self.set_test_buttons_enabled(False)
-        self.stop_btn.setEnabled(True)
-        
-        # Simple timer-based simulation to avoid threading issues
-        self.upload_timer = QTimer()
-        self.upload_start_time = time.time()
-        self.upload_duration = 12
-        self.upload_base_speed = 40  # Conservative built-in speed
-        
-        def update_upload():
-            import time  # Import in nested function too
-            try:
-                elapsed = time.time() - self.upload_start_time
-                if elapsed >= self.upload_duration:
-                    # Test completed
-                    self.upload_timer.stop()
-                    self.success(f"Built-in upload test: {self.upload_base_speed:.1f} Mbps (simulated)")
-                    self.warning("For accurate gigabit speeds, use '🚀 Official Speedtest'")
-                    self.progress_bar.setValue(100)
-                    self.progress_label.setText("Upload test completed")
-                    self.set_test_buttons_enabled(True)
-                    self.stop_btn.setEnabled(False)
-                    return
-                
-                # Update progress and speed
-                progress = int((elapsed / self.upload_duration) * 100)
-                
-                # Simulate realistic speed variation
-                import random
-                variation = random.uniform(-8, 8)
-                current_speed = max(5, self.upload_base_speed + variation)
-                
-                self.current_upload_speed = current_speed
-                self.update_speed_displays()
-                self.progress_bar.setValue(progress)
-                self.progress_label.setText(f"Upload: {current_speed:.1f} Mbps (simulated)")
-                
-            except Exception as e:
-                self.upload_timer.stop()
-                self.error(f"Upload test error: {str(e)}")
-                self.set_test_buttons_enabled(True)
-                self.stop_btn.setEnabled(False)
-        
-        self.upload_timer.timeout.connect(update_upload)
-        self.upload_timer.start(200)  # Update every 200ms
+        """Test upload speed using built-in method"""
+        self.speedtest_tools.test_upload()
     
     def comprehensive_test(self):
         """Run comprehensive speed test"""
@@ -727,33 +661,9 @@ After installation, restart SigmaToolkit."""
         
         self.speedtest_tools.comprehensive_speed_test(server)
         
-        # Auto re-enable buttons after comprehensive test (longer duration)
+        # Auto re-enable buttons after comprehensive test
         QTimer.singleShot(45000, lambda: self.set_test_buttons_enabled(True))
         QTimer.singleShot(45000, lambda: self.stop_btn.setEnabled(False))
-    
-    def test_lan_speed(self):
-        """Test LAN speed"""
-        target_ip = self.lan_ip_edit.text().strip()
-        if not target_ip:
-            self.error("Please enter target IP address")
-            return
-            
-        port = self.lan_port_spin.value()
-        
-        self.info(f"Starting LAN speed test to {target_ip}:{port}...")
-        self.current_download_speed = 0.0
-        self.update_speed_displays()
-        
-        self.progress_bar.setValue(0)
-        self.progress_label.setText("Testing LAN speed...")
-        self.set_test_buttons_enabled(False)
-        self.stop_btn.setEnabled(True)
-        
-        self.speedtest_tools.lan_speed_test(target_ip, port)
-        
-        # Auto re-enable buttons after test
-        QTimer.singleShot(15000, lambda: self.set_test_buttons_enabled(True))
-        QTimer.singleShot(15000, lambda: self.stop_btn.setEnabled(False))
     
     def detect_local_devices(self):
         """Detect devices on local network"""
@@ -830,14 +740,9 @@ After installation, restart SigmaToolkit."""
         # Stop speedtest tools
         self.speedtest_tools.stop_test()
         
-        # Stop any built-in test timers
-        if hasattr(self, 'download_timer') and self.download_timer.isActive():
-            self.download_timer.stop()
-            self.info("Built-in download test stopped")
-            
-        if hasattr(self, 'upload_timer') and self.upload_timer.isActive():
-            self.upload_timer.stop()
-            self.info("Built-in upload test stopped")
+        # Stop LAN tools if available
+        if LAN_TOOLS_AVAILABLE:
+            self.lan_tools.stop_test()
         
         # Reset UI
         self.progress_bar.setValue(0)
