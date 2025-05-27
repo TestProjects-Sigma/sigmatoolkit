@@ -110,7 +110,7 @@ class SMTPTools(QObject):
         
     def send_test_email(self, server, port, username, password, from_email, to_email, 
                        subject="SigmaToolkit Test Email", use_tls=False, use_ssl=False, timeout=10):
-        """Send a test email"""
+        """Send a test email with optional authentication"""
         def _send_test():
             try:
                 self.logger.debug(f"Sending test email from {from_email} to {to_email}")
@@ -123,9 +123,11 @@ class SMTPTools(QObject):
                 msg['Subject'] = subject
                 
                 # Email body
+                auth_status = "with authentication" if username and password else "without authentication (relay)"
                 body = f"""This is a test email sent from SigmaToolkit SMTP Tester.
 
 Server: {server}:{port}
+Authentication: {auth_status}
 Timestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}
 Encryption: {'SSL' if use_ssl else 'TLS' if use_tls else 'None'}
 
@@ -144,24 +146,33 @@ SigmaToolkit - Sigma's IT Swiss Army Knife
                     if use_tls:
                         server_obj.starttls()
                 
+                # Optional authentication
                 if username and password:
                     server_obj.login(username, password)
                     self.result_ready.emit("Authenticated successfully", "SUCCESS")
+                else:
+                    self.result_ready.emit("Proceeding without authentication (relay test)", "INFO")
                 
                 # Send email
                 text = msg.as_string()
                 server_obj.sendmail(from_email, to_email, text)
                 server_obj.quit()
                 
-                self.result_ready.emit(f"✅ Test email sent successfully to {to_email}!", "SUCCESS")
+                success_msg = f"✅ Test email sent successfully to {to_email}!"
+                if not username and not password:
+                    success_msg += " (via relay)"
+                self.result_ready.emit(success_msg, "SUCCESS")
                 self.result_ready.emit("Check the recipient's inbox and spam folder", "INFO")
                 
             except smtplib.SMTPAuthenticationError as e:
                 self.result_ready.emit(f"Authentication failed: {str(e)}", "ERROR")
+                self.result_ready.emit("💡 Try without authentication for relay testing", "INFO")
             except smtplib.SMTPRecipientsRefused as e:
                 self.result_ready.emit(f"Recipient refused: {str(e)}", "ERROR")
             except smtplib.SMTPSenderRefused as e:
                 self.result_ready.emit(f"Sender refused: {str(e)}", "ERROR")
+                if not username and not password:
+                    self.result_ready.emit("💡 Server may require authentication", "INFO")
             except smtplib.SMTPDataError as e:
                 self.result_ready.emit(f"SMTP data error: {str(e)}", "ERROR")
             except Exception as e:
@@ -274,10 +285,13 @@ SigmaToolkit - Sigma's IT Swiss Army Knife
         
     def comprehensive_smtp_test(self, server, port, username="", password="", 
                                from_email="", to_email="", use_tls=False, use_ssl=False):
-        """Run a comprehensive SMTP test"""
+        """Run a comprehensive SMTP test with optional authentication"""
         def _comprehensive_test():
             self.result_ready.emit("=== Comprehensive SMTP Test Started ===", "INFO")
             self.result_ready.emit(f"Target: {server}:{port}", "INFO")
+            
+            auth_status = "with authentication" if username and password else "without authentication (relay mode)"
+            self.result_ready.emit(f"Mode: {auth_status}", "INFO")
             
             # Test 1: Port connectivity
             self.result_ready.emit("\n1. Testing port connectivity...", "INFO")
@@ -300,16 +314,17 @@ SigmaToolkit - Sigma's IT Swiss Army Knife
                 self.test_authentication(server, port, username, password, use_tls, use_ssl)
                 time.sleep(3)
             else:
-                self.result_ready.emit("\n3. Skipping authentication test (no credentials)", "WARNING")
+                self.result_ready.emit("\n3. Skipping authentication test (relay mode)", "INFO")
             
-            # Test 4: Send test email (if all details provided)
-            if username and password and from_email and to_email:
-                self.result_ready.emit("\n4. Sending test email...", "INFO")
+            # Test 4: Send test email (if email details provided)
+            if from_email and to_email:
+                relay_note = " (relay mode)" if not username and not password else ""
+                self.result_ready.emit(f"\n4. Sending test email{relay_note}...", "INFO")
                 time.sleep(0.5)
                 self.send_test_email(server, port, username, password, from_email, to_email,
                                    "SigmaToolkit Comprehensive SMTP Test", use_tls, use_ssl)
             else:
-                self.result_ready.emit("\n4. Skipping email test (incomplete details)", "WARNING")
+                self.result_ready.emit("\n4. Skipping email test (incomplete email details)", "WARNING")
             
             time.sleep(2)
             self.result_ready.emit("\n=== Comprehensive SMTP Test Completed ===", "INFO")

@@ -51,19 +51,24 @@ class SMTPTab(BaseTab):
         layout.addWidget(server_group)
         
         # Authentication Section
-        auth_group = QGroupBox("Authentication (Optional)")
+        auth_group = QGroupBox("Authentication (Optional - for Relay Testing)")
         auth_layout = QGridLayout(auth_group)
         
         auth_layout.addWidget(QLabel("Username:"), 0, 0)
         self.username_edit = QLineEdit()
-        self.username_edit.setPlaceholderText("your.email@domain.com")
+        self.username_edit.setPlaceholderText("Leave empty for relay testing")
         auth_layout.addWidget(self.username_edit, 0, 1)
         
         auth_layout.addWidget(QLabel("Password:"), 0, 2)
         self.password_edit = QLineEdit()
         self.password_edit.setEchoMode(QLineEdit.Password)
-        self.password_edit.setPlaceholderText("Enter password")
+        self.password_edit.setPlaceholderText("Leave empty for relay testing")
         auth_layout.addWidget(self.password_edit, 0, 3)
+        
+        # Add relay info
+        relay_info = QLabel("💡 Leave username/password empty to test mail relay without authentication")
+        relay_info.setStyleSheet("color: #0078d4; font-style: italic;")
+        auth_layout.addWidget(relay_info, 1, 0, 1, 4)
         
         layout.addWidget(auth_group)
         
@@ -143,6 +148,7 @@ class SMTPTab(BaseTab):
             "• Port 587: Modern SMTP with STARTTLS (recommended)\n"
             "• Port 465: SMTP over SSL (legacy but still used)\n"
             "• Port 25: Plain SMTP (often blocked by ISPs)\n"
+            "• Leave username/password empty for relay testing\n"
             "• Use 'Comprehensive Test' for complete server analysis\n"
             "• Check MX records first to find the mail server for a domain"
         )
@@ -371,7 +377,8 @@ class SMTPTab(BaseTab):
             self.error("Please enter SMTP server address")
             return
         if not config['username'] or not config['password']:
-            self.error("Please enter username and password")
+            self.warning("No credentials provided - skipping authentication test")
+            self.info("Use this test when you have username/password to verify")
             return
             
         self.auth_btn.setEnabled(False)
@@ -390,12 +397,15 @@ class SMTPTab(BaseTab):
         if not config['server']:
             self.error("Please enter SMTP server address")
             return
-        if not config['username'] or not config['password']:
-            self.error("Please enter username and password")
-            return
         if not config['from_email'] or not config['to_email']:
             self.error("Please enter both 'From' and 'To' email addresses")
             return
+            
+        # Check if this is relay testing
+        if not config['username'] and not config['password']:
+            self.info("Sending test email via relay (no authentication)")
+        else:
+            self.info("Sending authenticated test email")
             
         self.send_btn.setEnabled(False)
         self.info(f"Sending test email from {config['from_email']} to {config['to_email']}...")

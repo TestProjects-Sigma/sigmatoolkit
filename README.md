@@ -25,13 +25,15 @@ Sigma's IT Swiss Army Knife - A comprehensive PyQt5-based GUI application design
 
 ### SMTP Testing (v1.2.0)
 - **Connection Testing**: Verify SMTP server connectivity and capabilities
-- **Authentication Testing**: Test username/password authentication with detailed error reporting
+- **Optional Authentication**: Test with credentials OR without for relay testing
+- **Relay Testing**: Test internal mail servers without authentication requirements
 - **Email Sending**: Send actual test emails with delivery confirmation
 - **Encryption Support**: TLS (STARTTLS) and SSL connection options
 - **Port Scanning**: Test connectivity to common SMTP ports (25, 465, 587, 2525)
 - **MX Record Integration**: Check domain mail server configuration
 - **Quick Presets**: Pre-configured settings for Gmail, Outlook, Office 365, Yahoo
 - **Comprehensive Testing**: All-in-one SMTP server analysis and troubleshooting
+- **Flexible Authentication**: Supports both authenticated and open relay configurations
 
 ### General Features
 - **Multi-Tab Interface**: Organized testing categories with clean navigation
@@ -188,21 +190,18 @@ SigmaToolkit/
 - **Encryption Options**: Choose between TLS (STARTTLS) or SSL encryption
 - **Timeout Control**: Configure connection timeout (5-60 seconds)
 
-#### Connection Testing
-- **Basic Connection**: Test connectivity to SMTP server
-- **Capability Detection**: View server features and supported authentication methods
-- **Port Scanning**: Test connectivity to common SMTP ports (25, 465, 587, 2525)
-
-#### Authentication Testing
-- **Credential Verification**: Test username and password authentication
-- **Auth Method Support**: Detect supported authentication mechanisms
-- **Detailed Error Reporting**: Clear feedback on authentication failures
+#### Authentication Options
+- **Optional Authentication**: Leave username/password empty for relay testing
+- **Credential Testing**: Test username and password authentication when provided
+- **Relay Mode**: Test internal mail servers without authentication requirements
+- **Smart Error Handling**: Helpful suggestions for authentication failures
 
 #### Email Testing
 - **Test Email Sending**: Send actual test emails with customizable content
+- **Relay Support**: Send emails through open relay servers (no auth required)
 - **Delivery Confirmation**: Verify successful email transmission
 - **Custom Recipients**: Configure sender and recipient addresses
-- **Subject Customization**: Personalize test email subject lines
+- **Authentication Status**: Email body shows whether auth was used or relay mode
 
 #### Quick Server Presets
 - **Gmail**: Pre-configured Gmail SMTP settings (smtp.gmail.com:587)
