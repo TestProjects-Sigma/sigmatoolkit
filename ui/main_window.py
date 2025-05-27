@@ -2,7 +2,7 @@
 from PyQt5.QtWidgets import (QMainWindow, QTabWidget, QVBoxLayout, 
                             QWidget, QMenuBar, QAction, QMessageBox,
                             QSplitter, QTextEdit, QHBoxLayout, QPushButton,
-                            QApplication)
+                            QApplication, QLabel)  # Added QLabel here
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont
 from network.network_tab import NetworkTab
@@ -20,7 +20,7 @@ class MainWindow(QMainWindow):
         
     def init_ui(self):
         self.setWindowTitle(f"SigmaToolkit v{self.version}")
-        self.setGeometry(100, 100, 1400, 950)  # Larger for speedtest displays
+        self.setGeometry(100, 100, 1500, 1000)  # Larger window for better layout
         
         # Create central widget
         central_widget = QWidget()
@@ -29,8 +29,8 @@ class MainWindow(QMainWindow):
         # Create main layout
         main_layout = QVBoxLayout(central_widget)
         
-        # Create splitter for tabs and output
-        splitter = QSplitter(Qt.Vertical)
+        # Create splitter for tabs and output (horizontal split)
+        splitter = QSplitter(Qt.Horizontal)  # Changed to horizontal
         
         # Create tab widget
         self.tab_widget = QTabWidget()
@@ -51,9 +51,15 @@ class MainWindow(QMainWindow):
         self.speedtest_tab = SpeedTestTab(self.logger)
         self.tab_widget.addTab(self.speedtest_tab, "⚡ Speed Testing")
         
-        # Create output section
+        # Create output section with larger, better layout
         output_widget = QWidget()
         output_layout = QVBoxLayout(output_widget)
+        
+        # Output header
+        output_header = QLabel("📊 Real-time Results & Logs")
+        output_header.setFont(QFont("Arial", 12, QFont.Bold))
+        output_header.setStyleSheet("color: #0078d4; padding: 5px;")
+        output_layout.addWidget(output_header)
         
         # Output controls
         controls_layout = QHBoxLayout()
@@ -62,30 +68,77 @@ class MainWindow(QMainWindow):
         self.debug_btn = QPushButton("Toggle Debug")
         self.debug_btn.setCheckable(True)
         
+        # Style the control buttons
+        button_style = """
+            QPushButton {
+                background-color: #f0f0f0;
+                border: 1px solid #ccc;
+                padding: 6px 12px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #e0e0e0;
+            }
+            QPushButton:pressed {
+                background-color: #d0d0d0;
+            }
+            QPushButton:checked {
+                background-color: #0078d4;
+                color: white;
+            }
+        """
+        
+        self.clear_btn.setStyleSheet(button_style)
+        self.copy_btn.setStyleSheet(button_style)
+        self.debug_btn.setStyleSheet(button_style)
+        
         controls_layout.addWidget(self.clear_btn)
         controls_layout.addWidget(self.copy_btn)
         controls_layout.addWidget(self.debug_btn)
         controls_layout.addStretch()
         
-        # Output text area
+        # Output text area - much larger and better styled
         self.output_text = QTextEdit()
-        self.output_text.setFont(QFont("Consolas", 10))
+        self.output_text.setFont(QFont("Consolas", 11))  # Slightly larger font
         self.output_text.setReadOnly(True)
+        self.output_text.setMinimumWidth(500)  # Minimum width
         self.output_text.setStyleSheet("""
             QTextEdit {
                 background-color: #1e1e1e;
                 color: #ffffff;
-                border: 1px solid #555;
+                border: 2px solid #555;
+                border-radius: 6px;
+                padding: 8px;
+                selection-background-color: #0078d4;
+            }
+            QScrollBar:vertical {
+                background-color: #2d2d2d;
+                width: 12px;
+                border-radius: 6px;
+            }
+            QScrollBar::handle:vertical {
+                background-color: #555;
+                border-radius: 6px;
+                min-height: 20px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background-color: #666;
             }
         """)
         
         output_layout.addLayout(controls_layout)
         output_layout.addWidget(self.output_text)
         
-        # Add to splitter
+        # Add to splitter with much larger output area
         splitter.addWidget(self.tab_widget)
         splitter.addWidget(output_widget)
-        splitter.setSizes([650, 300])  # More space for speedtest visuals
+        splitter.setSizes([800, 700])  # 53% tabs, 47% output - Much larger output!
+        
+        # Make the splitter movable and set minimum sizes
+        splitter.setChildrenCollapsible(False)  # Prevent collapsing
+        self.tab_widget.setMinimumWidth(600)     # Minimum tab area
+        output_widget.setMinimumWidth(400)       # Minimum output area
         
         main_layout.addWidget(splitter)
         
