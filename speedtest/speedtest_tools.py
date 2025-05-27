@@ -1,4 +1,4 @@
-# speedtest/speedtest_tools.py - WITH SPEEDTEST.NET CLI INTEGRATION
+# speedtest/speedtest_tools.py - FIXED VERSION WITH SAFE LAN TESTING
 import threading
 import time
 import socket
@@ -19,15 +19,6 @@ class SpeedTestTools(QObject):
         self.logger = logger
         self.test_running = False
         self.speedtest_cli_available = self.check_speedtest_cli()
-        
-        # Test servers for fallback
-        self.test_servers = [
-            {"name": "Speedtest.net CLI", "url": "speedtest-cli", "host": "speedtest.net"},
-            {"name": "Cloudflare CDN", "url": "https://speed.cloudflare.com", "host": "speed.cloudflare.com"},
-            {"name": "Fast.com (Netflix)", "url": "https://fast.com", "host": "fast.com"},
-            {"name": "Google", "url": "https://www.google.com", "host": "www.google.com"},
-            {"name": "Microsoft Azure", "url": "https://download.microsoft.com", "host": "download.microsoft.com"}
-        ]
         
     def check_speedtest_cli(self):
         """Check if speedtest CLI is available with better detection"""
@@ -65,44 +56,9 @@ class SpeedTestTools(QObject):
             except (FileNotFoundError, subprocess.TimeoutExpired, Exception) as e:
                 self.logger.debug(f"speedtest-cli not found: {e}")
         
-        # Test 3: Check if 'speedtest' is actually speedtest-cli
         if not detected_cli:
-            try:
-                result = subprocess.run(["speedtest", "--help"], 
-                                      capture_output=True, text=True, timeout=10)
-                if result.returncode == 0 and "--json" in result.stdout and "--simple" in result.stdout:
-                    # This looks like speedtest-cli, not official Ookla
-                    self.result_ready.emit("✅ Found speedtest-cli (aliased as 'speedtest')", "SUCCESS")
-                    detected_cli = "speedtest-as-cli"  # Special case
-            except (FileNotFoundError, subprocess.TimeoutExpired, Exception) as e:
-                self.logger.debug(f"speedtest help check failed: {e}")
-        
-        if not detected_cli:
-            # Neither found - provide installation guidance
             self.result_ready.emit("❌ Speedtest CLI not found", "ERROR")
-            self.result_ready.emit("", "INFO")
-            self.result_ready.emit("📥 To install Speedtest CLI:", "INFO")
-            self.result_ready.emit("", "INFO")
-            
-            import platform
-            system = platform.system().lower()
-            
-            if system == "windows":
-                self.result_ready.emit("🪟 Windows Options:", "INFO")
-                self.result_ready.emit("1. pip install speedtest-cli", "INFO")
-                self.result_ready.emit("2. Download from: https://www.speedtest.net/apps/cli", "INFO")
-                self.result_ready.emit("3. choco install speedtest", "INFO")
-            elif system == "linux":
-                self.result_ready.emit("🐧 Linux Options:", "INFO")
-                self.result_ready.emit("1. sudo apt install speedtest-cli", "INFO")
-                self.result_ready.emit("2. pip install speedtest-cli", "INFO")
-            elif system == "darwin":
-                self.result_ready.emit("🍎 macOS Options:", "INFO")
-                self.result_ready.emit("1. brew install speedtest-cli", "INFO")
-                self.result_ready.emit("2. pip install speedtest-cli", "INFO")
-            
-            self.result_ready.emit("", "INFO")
-            self.result_ready.emit("⚠️ Using built-in tests for now (less accurate for gigabit)", "WARNING")
+            self.result_ready.emit("💡 Install with: pip install speedtest-cli", "INFO")
             
         return detected_cli
         
@@ -131,11 +87,6 @@ class SpeedTestTools(QObject):
                     cmd = ["speedtest-cli", "--json"]
                     if server_id:
                         cmd.extend(["--server", str(server_id)])
-                elif self.speedtest_cli_available == "speedtest-as-cli":
-                    # speedtest command that's actually speedtest-cli
-                    cmd = ["speedtest", "--json"]
-                    if server_id:
-                        cmd.extend(["--server", str(server_id)])
                 else:
                     self.result_ready.emit("❌ Unknown CLI type", "ERROR")
                     return
@@ -151,16 +102,11 @@ class SpeedTestTools(QObject):
                                              stderr=subprocess.PIPE, text=True)
                 except FileNotFoundError:
                     self.result_ready.emit(f"❌ Command not found: {cmd[0]}", "ERROR")
-                    self.result_ready.emit("Please check your installation and PATH", "WARNING")
-                    
-                    # Suggest fallback
-                    if self.speedtest_cli_available == "speedtest":
-                        self.result_ready.emit("💡 Try installing: pip install speedtest-cli", "INFO")
                     return
                 
                 # Monitor progress with more realistic timing
                 start_time = time.time()
-                estimated_duration = 45  # speedtest-cli usually takes longer
+                estimated_duration = 45
                 
                 while process.poll() is None and self.test_running:
                     elapsed = time.time() - start_time
@@ -196,34 +142,13 @@ class SpeedTestTools(QObject):
                     self.result_ready.emit("⏱️ Speedtest process timed out", "ERROR")
                     return
                 
-                self.logger.debug(f"Process return code: {process.returncode}")
-                self.logger.debug(f"stdout length: {len(stdout) if stdout else 0}")
-                self.logger.debug(f"stderr: {stderr}")
-                
-                if process.returncode == 0:
-                    if stdout and stdout.strip():
-                        self.result_ready.emit("✅ Speedtest completed successfully", "SUCCESS")
-                        self.parse_speedtest_results(stdout)
-                    else:
-                        self.result_ready.emit("❌ Speedtest returned empty results", "ERROR")
-                        self.result_ready.emit(f"Command used: {' '.join(cmd)}", "INFO")
-                        if stderr:
-                            self.result_ready.emit(f"Error output: {stderr}", "ERROR")
-                        self.result_ready.emit("💡 Try the '🔧 Test CLI' button to verify your setup", "INFO")
+                if process.returncode == 0 and stdout and stdout.strip():
+                    self.result_ready.emit("✅ Speedtest completed successfully", "SUCCESS")
+                    self.parse_speedtest_results(stdout)
                 else:
                     self.result_ready.emit(f"❌ Speedtest failed (exit code: {process.returncode})", "ERROR")
                     if stderr:
                         self.result_ready.emit(f"Error details: {stderr}", "ERROR")
-                        
-                        # Provide specific help based on error
-                        if "not found" in stderr.lower():
-                            self.result_ready.emit("💡 CLI not found in PATH", "INFO")
-                        elif "license" in stderr.lower():
-                            self.result_ready.emit("💡 Try running the command manually first to accept license", "INFO")
-                        elif "network" in stderr.lower():
-                            self.result_ready.emit("💡 Check your internet connection", "INFO")
-                    
-                    self.result_ready.emit("💡 The '🔧 Test CLI' button works, so try that instead", "WARNING")
                     
             except Exception as e:
                 self.result_ready.emit(f"❌ Speedtest error: {str(e)}", "ERROR")
@@ -239,9 +164,6 @@ class SpeedTestTools(QObject):
     def parse_speedtest_results(self, json_output):
         """Parse speedtest CLI JSON output with better debugging"""
         try:
-            self.logger.debug(f"Raw JSON output length: {len(json_output)}")
-            self.logger.debug(f"First 200 chars: {json_output[:200]}")
-            
             # Clean the output - remove any non-JSON content
             json_output = json_output.strip()
             
@@ -251,12 +173,9 @@ class SpeedTestTools(QObject):
             
             if json_start == -1 or json_end == 0:
                 self.result_ready.emit("❌ No JSON data found in output", "ERROR")
-                self.result_ready.emit(f"Raw output: {json_output[:500]}", "INFO")
                 return
             
             clean_json = json_output[json_start:json_end]
-            self.logger.debug(f"Cleaned JSON: {clean_json[:200]}...")
-            
             data = json.loads(clean_json)
             
             # Handle different CLI versions
@@ -274,8 +193,6 @@ class SpeedTestTools(QObject):
                     download_mbps = (download_bps * 8) / 1000000
                     upload_mbps = (upload_bps * 8) / 1000000
                     
-                    self.logger.debug(f"Ookla format: D={download_mbps:.1f} U={upload_mbps:.1f}")
-                    
                 elif isinstance(data.get("download"), (int, float)):
                     # Python speedtest-cli format (older)
                     download_mbps = data["download"] / 1000000  # Convert from bps to Mbps
@@ -289,21 +206,16 @@ class SpeedTestTools(QObject):
                     server_city = server_info.get("name", "")
                     server_location = f"{server_city}, {server_country}".strip(", ")
                     
-                    self.logger.debug(f"Python CLI format: D={download_mbps:.1f} U={upload_mbps:.1f}")
                 else:
                     self.result_ready.emit("❌ Unknown speedtest data format", "ERROR")
-                    self.result_ready.emit(f"Download field type: {type(data.get('download'))}", "INFO")
-                    self.result_ready.emit(f"Sample data: {str(data)[:300]}", "INFO")
                     return
             else:
                 self.result_ready.emit("❌ Missing download/upload data in results", "ERROR")
-                self.result_ready.emit(f"Available keys: {list(data.keys())}", "INFO")
                 return
             
             # Update real-time displays
             self.speed_update.emit(download_mbps, "download")
             self.speed_update.emit(upload_mbps, "upload")
-            self.speed_update.emit(ping_ms, "latency")
             
             # Display results
             self.result_ready.emit("🎯 Official Speedtest Results:", "SUCCESS")
@@ -328,29 +240,10 @@ class SpeedTestTools(QObject):
             
             self.result_ready.emit(f"📊 Assessment: {assessment}", level)
             
-            # Additional info
-            if "client" in data:
-                client_info = data["client"]
-                if "isp" in client_info:
-                    self.result_ready.emit(f"🌐 ISP: {client_info['isp']}", "INFO")
-                if "ip" in client_info:
-                    self.result_ready.emit(f"🔗 IP: {client_info['ip']}", "INFO")
-            
-            self.result_ready.emit("✨ These are your REAL internet speeds!", "SUCCESS")
-            
         except json.JSONDecodeError as e:
             self.result_ready.emit(f"❌ JSON parsing error: {str(e)}", "ERROR")
-            self.result_ready.emit("Raw output (first 500 chars):", "INFO")
-            self.result_ready.emit(json_output[:500], "INFO")
-            self.result_ready.emit("", "INFO")
-            self.result_ready.emit("💡 Debugging tips:", "INFO")
-            self.result_ready.emit("1. Try running 'speedtest-cli --json' manually", "INFO")
-            self.result_ready.emit("2. Check if speedtest-cli is the latest version", "INFO")
-            self.result_ready.emit("3. Try 'pip install --upgrade speedtest-cli'", "INFO")
         except Exception as e:
             self.result_ready.emit(f"❌ Error parsing speedtest results: {str(e)}", "ERROR")
-            self.result_ready.emit(f"Data type: {type(json_output)}", "INFO")
-            self.result_ready.emit(f"Data length: {len(json_output) if json_output else 0}", "INFO")
             
     def list_speedtest_servers(self):
         """List available speedtest servers"""
@@ -446,17 +339,10 @@ class SpeedTestTools(QObject):
                         min_latency = min(latencies)
                         max_latency = max(latencies)
                         
-                        if len(latencies) > 1:
-                            variance = sum((x - avg_latency) ** 2 for x in latencies) / len(latencies)
-                            jitter = variance ** 0.5
-                        else:
-                            jitter = 0
-                        
                         self.result_ready.emit(f"✅ Latency Test Results for {host}:", "SUCCESS")
                         self.result_ready.emit(f"  Average: {avg_latency:.1f} ms", "INFO")
                         self.result_ready.emit(f"  Minimum: {min_latency:.1f} ms", "INFO")
                         self.result_ready.emit(f"  Maximum: {max_latency:.1f} ms", "INFO")
-                        self.result_ready.emit(f"  Jitter: {jitter:.1f} ms", "INFO")
                         
                         self.speed_update.emit(avg_latency, "latency")
                         
@@ -481,6 +367,197 @@ class SpeedTestTools(QObject):
         thread = threading.Thread(target=_ping_test)
         thread.daemon = True
         thread.start()
+        
+    def lan_speed_test(self, target_ip, port=12345):
+        """Safe LAN speed test with proper error handling"""
+        def _lan_test():
+            try:
+                self.logger.debug(f"Starting LAN speed test to {target_ip}:{port}")
+                self.result_ready.emit(f"🏠 Testing LAN speed to {target_ip}:{port}...", "INFO")
+                
+                # Validate IP address first
+                try:
+                    import ipaddress
+                    ip_obj = ipaddress.ip_address(target_ip)
+                    self.result_ready.emit(f"✅ Valid IP address: {target_ip}", "INFO")
+                except ValueError:
+                    self.result_ready.emit(f"❌ Invalid IP address: {target_ip}", "ERROR")
+                    return
+                
+                # Test basic connectivity first
+                self.progress_update.emit(10, "Testing connectivity...")
+                
+                # Simple ping test first
+                try:
+                    if platform.system().lower() == "windows":
+                        ping_cmd = ["ping", "-n", "1", target_ip]
+                    else:
+                        ping_cmd = ["ping", "-c", "1", target_ip]
+                    
+                    ping_result = subprocess.run(ping_cmd, capture_output=True, text=True, timeout=5)
+                    
+                    if ping_result.returncode == 0:
+                        self.result_ready.emit(f"✅ {target_ip} is reachable", "SUCCESS")
+                    else:
+                        self.result_ready.emit(f"⚠️ {target_ip} may not be reachable", "WARNING")
+                        self.result_ready.emit("Continuing with LAN test anyway...", "INFO")
+                        
+                except Exception as e:
+                    self.result_ready.emit(f"Ping test failed: {str(e)}", "WARNING")
+                
+                self.progress_update.emit(30, "Testing port connectivity...")
+                
+                # Test port connectivity
+                try:
+                    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    sock.settimeout(5)
+                    
+                    result = sock.connect_ex((target_ip, port))
+                    sock.close()
+                    
+                    if result == 0:
+                        self.result_ready.emit(f"✅ Port {port} is open on {target_ip}", "SUCCESS")
+                        self.progress_update.emit(50, "Port is accessible, testing speed...")
+                        
+                        # Simple speed estimation based on latency
+                        self._estimate_lan_speed(target_ip, port)
+                        
+                    else:
+                        self.result_ready.emit(f"❌ Port {port} is closed on {target_ip}", "ERROR")
+                        self.result_ready.emit("💡 LAN speed test requires a service listening on the target port", "INFO")
+                        self.result_ready.emit("💡 Try common ports: 22 (SSH), 80 (HTTP), 443 (HTTPS), 445 (SMB)", "INFO")
+                        
+                        # Still provide some basic network info
+                        self._provide_basic_lan_info(target_ip)
+                        
+                except socket.error as e:
+                    self.result_ready.emit(f"❌ Connection error: {str(e)}", "ERROR")
+                    self._provide_basic_lan_info(target_ip)
+                    
+                except Exception as e:
+                    self.result_ready.emit(f"❌ LAN test error: {str(e)}", "ERROR")
+                    
+            except Exception as e:
+                self.result_ready.emit(f"❌ LAN speed test failed: {str(e)}", "ERROR")
+                self.logger.error(f"LAN test exception: {e}")
+            finally:
+                self.progress_update.emit(100, "LAN test completed")
+                
+        thread = threading.Thread(target=_lan_test)
+        thread.daemon = True
+        thread.start()
+    
+    def _estimate_lan_speed(self, target_ip, port):
+        """Estimate LAN speed based on latency and basic tests"""
+        try:
+            # Simple latency-based estimation
+            start_time = time.time()
+            
+            # Multiple quick connections to estimate speed
+            connection_times = []
+            
+            for i in range(5):
+                try:
+                    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    sock.settimeout(2)
+                    
+                    connect_start = time.time()
+                    result = sock.connect_ex((target_ip, port))
+                    connect_time = (time.time() - connect_start) * 1000  # Convert to ms
+                    
+                    sock.close()
+                    
+                    if result == 0:
+                        connection_times.append(connect_time)
+                        self.progress_update.emit(50 + (i * 10), f"Testing connection {i+1}/5...")
+                    
+                    time.sleep(0.1)  # Small delay between tests
+                    
+                except Exception:
+                    pass
+            
+            if connection_times:
+                avg_latency = sum(connection_times) / len(connection_times)
+                
+                # Estimate speed based on latency (rough approximation)
+                if avg_latency < 1:
+                    estimated_speed = 1000  # Very fast LAN
+                elif avg_latency < 5:
+                    estimated_speed = 100   # Fast LAN
+                elif avg_latency < 20:
+                    estimated_speed = 10    # Standard LAN
+                else:
+                    estimated_speed = 1     # Slow connection
+                
+                self.speed_update.emit(estimated_speed, "lan")
+                
+                self.result_ready.emit("🏠 LAN Speed Test Results:", "SUCCESS")
+                self.result_ready.emit(f"  Average Latency: {avg_latency:.2f} ms", "INFO")
+                self.result_ready.emit(f"  Estimated Speed: ~{estimated_speed} Mbps", "INFO")
+                
+                if avg_latency < 1:
+                    self.result_ready.emit("  Quality: ⚡ Excellent LAN performance", "SUCCESS")
+                elif avg_latency < 5:
+                    self.result_ready.emit("  Quality: ✅ Good LAN performance", "SUCCESS")
+                elif avg_latency < 20:
+                    self.result_ready.emit("  Quality: ⚠️ Average LAN performance", "WARNING")
+                else:
+                    self.result_ready.emit("  Quality: 🐌 Slow LAN connection", "WARNING")
+                
+                self.result_ready.emit("", "INFO")
+                self.result_ready.emit("💡 Note: This is a basic estimation", "INFO")
+                self.result_ready.emit("💡 For accurate LAN testing, use dedicated tools like iperf3", "INFO")
+                
+            else:
+                self.result_ready.emit("❌ Could not establish reliable connections for speed testing", "ERROR")
+                
+        except Exception as e:
+            self.result_ready.emit(f"Speed estimation error: {str(e)}", "ERROR")
+    
+    def _provide_basic_lan_info(self, target_ip):
+        """Provide basic LAN information when speed test fails"""
+        try:
+            self.result_ready.emit("", "INFO")
+            self.result_ready.emit("🏠 Basic LAN Information:", "INFO")
+            self.result_ready.emit(f"  Target: {target_ip}", "INFO")
+            
+            # Try to get hostname
+            try:
+                hostname = socket.gethostbyaddr(target_ip)
+                self.result_ready.emit(f"  Hostname: {hostname[0]}", "INFO")
+            except:
+                self.result_ready.emit(f"  Hostname: Not available", "INFO")
+            
+            # Network class info
+            try:
+                import ipaddress
+                ip_obj = ipaddress.ip_address(target_ip)
+                
+                if ip_obj.is_private:
+                    if target_ip.startswith('192.168.'):
+                        network_type = "Home/Small Office Network (Class C)"
+                    elif target_ip.startswith('10.'):
+                        network_type = "Large Private Network (Class A)"
+                    elif target_ip.startswith('172.'):
+                        network_type = "Medium Private Network (Class B)"
+                    else:
+                        network_type = "Private Network"
+                else:
+                    network_type = "Public Network"
+                
+                self.result_ready.emit(f"  Network Type: {network_type}", "INFO")
+                
+            except:
+                pass
+            
+            self.result_ready.emit("", "INFO")
+            self.result_ready.emit("💡 For LAN speed testing:", "INFO")
+            self.result_ready.emit("  • Ensure target has a service running (HTTP, SSH, SMB)", "INFO")
+            self.result_ready.emit("  • Try ports: 22, 80, 443, 445, 21, 23", "INFO")
+            self.result_ready.emit("  • Use dedicated tools like iperf3 for accurate testing", "INFO")
+            
+        except Exception as e:
+            self.result_ready.emit(f"Basic info error: {str(e)}", "ERROR")
         
     def comprehensive_speed_test(self, server_info):
         """Run comprehensive speed test with CLI if available"""
