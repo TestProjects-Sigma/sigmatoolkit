@@ -1,9 +1,9 @@
-# mail/mail_tab.py
+# mail/mail_tab.py - Updated with file upload functionality
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
                             QLineEdit, QPushButton, QLabel, QGridLayout,
                             QTextEdit, QComboBox, QCheckBox, QSplitter,
                             QTreeWidget, QTreeWidgetItem, QTabWidget,
-                            QScrollArea, QFrame)
+                            QScrollArea, QFrame, QFileDialog, QMessageBox)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 from core.base_tab import BaseTab
@@ -52,7 +52,7 @@ class MailTab(BaseTab):
         input_group = QGroupBox("Email Header Input")
         input_layout = QVBoxLayout(input_group)
         
-        # Input method selection
+        # Input method selection with file upload support
         method_layout = QHBoxLayout()
         method_layout.addWidget(QLabel("Input Method:"))
         
@@ -64,9 +64,29 @@ class MailTab(BaseTab):
             "Load from Outlook (if available)"
         ])
         method_layout.addWidget(self.input_method_combo)
-        method_layout.addStretch()
         
+        # File upload button (initially hidden)
+        self.upload_file_btn = QPushButton("📁 Browse & Upload .eml File")
+        self.upload_file_btn.setVisible(False)  # Hidden by default
+        method_layout.addWidget(self.upload_file_btn)
+        
+        method_layout.addStretch()
         input_layout.addLayout(method_layout)
+        
+        # File info label (for showing selected file)
+        self.file_info_label = QLabel()
+        self.file_info_label.setVisible(False)
+        self.file_info_label.setStyleSheet("""
+            QLabel {
+                background-color: #e8f4fd;
+                border: 1px solid #0078d4;
+                border-radius: 4px;
+                padding: 8px;
+                color: #0078d4;
+                font-weight: bold;
+            }
+        """)
+        input_layout.addWidget(self.file_info_label)
         
         # Header text input
         self.header_input = QTextEdit()
@@ -80,7 +100,8 @@ class MailTab(BaseTab):
             "Date: Mon, 1 Jan 2024 12:00:00 +0000\n"
             "Message-ID: <123456@example.com>\n"
             "...\n\n"
-            "Tip: Copy headers from 'View Source' or 'Show Original' in your email client"
+            "Tip: Copy headers from 'View Source' or 'Show Original' in your email client\n"
+            "Or select 'Upload .eml File' above to load from a saved email file"
         )
         self.header_input.setMinimumHeight(200)
         self.header_input.setFont(QFont("Consolas", 10))
@@ -376,10 +397,29 @@ class MailTab(BaseTab):
             }
         """
         
+        upload_button_style = """
+            QPushButton {
+                background-color: #8764b8;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-weight: bold;
+                min-height: 30px;
+            }
+            QPushButton:hover {
+                background-color: #7356a1;
+            }
+            QPushButton:pressed {
+                background-color: #5f478a;
+            }
+        """
+        
         self.analyze_headers_btn.setStyleSheet(main_button_style)
         self.load_sample_btn.setStyleSheet(utility_button_style)
         self.clear_input_btn.setStyleSheet(utility_button_style)
         self.export_results_btn.setStyleSheet(utility_button_style)
+        self.upload_file_btn.setStyleSheet(upload_button_style)
     
     def style_auth_buttons(self):
         """Style the authentication buttons"""
@@ -461,6 +501,10 @@ class MailTab(BaseTab):
         self.load_sample_btn.clicked.connect(self.load_sample_headers)
         self.clear_input_btn.clicked.connect(self.clear_input)
         self.export_results_btn.clicked.connect(self.export_results)
+        self.upload_file_btn.clicked.connect(self.upload_eml_file)
+        
+        # Input method change connection
+        self.input_method_combo.currentTextChanged.connect(self.on_input_method_changed)
         
         # Authentication connections
         self.spf_check_btn.clicked.connect(self.check_spf)
@@ -481,7 +525,115 @@ class MailTab(BaseTab):
         
         # Auto-extract domain from headers
         self.header_input.textChanged.connect(self.auto_extract_domain)
+    
+    def on_input_method_changed(self, method):
+        """Handle input method selection change"""
+        if method == "Upload .eml File":
+            self.upload_file_btn.setVisible(True)
+            self.header_input.setPlaceholderText(
+                "Click 'Browse & Upload .eml File' button above to load email from file...\n\n"
+                "Supported formats:\n"
+                "• .eml files (standard email format)\n"
+                "• .msg files (Outlook format - experimental)\n"
+                "• .txt files containing email headers\n\n"
+                "Or manually paste headers below if you prefer."
+            )
+        else:
+            self.upload_file_btn.setVisible(False)
+            self.file_info_label.setVisible(False)
+            if method == "Paste Headers Directly":
+                self.header_input.setPlaceholderText(
+                    "Paste email headers here...\n\n"
+                    "Example headers to paste:\n"
+                    "Received: from mail.example.com...\n"
+                    "From: sender@example.com\n"
+                    "To: recipient@example.com\n"
+                    "Subject: Your Email Subject\n"
+                    "Date: Mon, 1 Jan 2024 12:00:00 +0000\n"
+                    "Message-ID: <123456@example.com>\n"
+                    "...\n\n"
+                    "Tip: Copy headers from 'View Source' or 'Show Original' in your email client"
+                )
+            elif method.startswith("Load from"):
+                self.header_input.setPlaceholderText(
+                    f"{method} - Feature coming soon!\n\n"
+                    "This will allow direct integration with email clients.\n"
+                    "For now, please use 'Paste Headers Directly' or 'Upload .eml File'."
+                )
+    
+    def upload_eml_file(self):
+        """Handle .eml file upload"""
+        try:
+            file_path, _ = QFileDialog.getOpenFileName(
+                self,
+                "Select Email File",
+                "",
+                "Email Files (*.eml *.msg *.txt);;All Files (*)"
+            )
+            
+            if file_path:
+                self.info(f"Loading email file: {file_path}")
+                
+                # Read the file
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        file_content = f.read()
+                except UnicodeDecodeError:
+                    # Try with different encoding
+                    try:
+                        with open(file_path, 'r', encoding='latin-1') as f:
+                            file_content = f.read()
+                    except Exception as e:
+                        self.error(f"Could not read file with any encoding: {str(e)}")
+                        return
+                
+                # Check if it's a valid email format
+                if not self.validate_email_content(file_content):
+                    reply = QMessageBox.question(
+                        self, 
+                        "Invalid Email Format", 
+                        "The selected file doesn't appear to contain valid email headers.\n\n"
+                        "Do you want to load it anyway?",
+                        QMessageBox.Yes | QMessageBox.No,
+                        QMessageBox.No
+                    )
+                    if reply == QMessageBox.No:
+                        return
+                
+                # Load content into text area
+                self.header_input.setPlainText(file_content)
+                
+                # Show file info
+                import os
+                file_name = os.path.basename(file_path)
+                file_size = os.path.getsize(file_path)
+                self.file_info_label.setText(
+                    f"📁 Loaded: {file_name} ({file_size:,} bytes)"
+                )
+                self.file_info_label.setVisible(True)
+                
+                self.success(f"Successfully loaded email file: {file_name}")
+                
+                # Auto-extract domain information
+                self.auto_extract_domain()
+                
+        except Exception as e:
+            self.error(f"Failed to upload file: {str(e)}")
+    
+    def validate_email_content(self, content):
+        """Validate if content contains email headers"""
+        # Check for common email headers
+        email_headers = [
+            'from:', 'to:', 'subject:', 'date:', 'message-id:', 
+            'received:', 'return-path:', 'mime-version:'
+        ]
         
+        content_lower = content.lower()
+        found_headers = sum(1 for header in email_headers if header in content_lower)
+        
+        # Consider valid if at least 3 common headers are found
+        return found_headers >= 3
+    
     def handle_result(self, message, level):
         """Handle results from mail tools"""
         if level == "SUCCESS":
@@ -508,7 +660,7 @@ class MailTab(BaseTab):
         """Analyze email headers"""
         headers_text = self.header_input.toPlainText().strip()
         if not headers_text:
-            self.error("Please paste email headers to analyze")
+            self.error("Please paste email headers to analyze or upload an .eml file")
             return
         
         self.analyze_headers_btn.setEnabled(False)
@@ -556,6 +708,7 @@ Return-Path: <john.doe@sender.com>
 This is a sample email for testing header analysis functionality."""
 
         self.header_input.setPlainText(sample_headers)
+        self.file_info_label.setVisible(False)  # Hide file info when loading sample
         self.info("Sample email headers loaded")
     
     def clear_input(self):
@@ -568,12 +721,11 @@ This is a sample email for testing header analysis functionality."""
         self.delivery_path_text.clear()
         self.delivery_stats_text.clear()
         self.spam_results_text.clear()
+        self.file_info_label.setVisible(False)
         self.info("Input and results cleared")
     
     def export_results(self):
         """Export analysis results"""
-        from PyQt5.QtWidgets import QFileDialog, QMessageBox
-        
         try:
             # Get all results
             headers = self.header_input.toPlainText()
