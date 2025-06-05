@@ -236,14 +236,22 @@ class DNSTab(BaseTab):
         self.records_domain_edit.returnPressed.connect(self.run_all_records)
         
     def on_dns_server_changed(self, text):
-        """Handle DNS server selection change"""
-        if "Custom" in text:
-            self.custom_dns_edit.setEnabled(True)
-            self.custom_dns_edit.setFocus()
-        else:
-            self.custom_dns_edit.setEnabled(False)
-            
-        self.info(f"DNS server selection: {text}")
+            """Handle DNS server selection change"""
+            if "Custom" in text:
+                self.custom_dns_edit.setEnabled(True)
+                self.custom_dns_edit.setFocus()
+                # For custom DNS, we'll set it when the user enters a value
+                self.custom_dns_edit.textChanged.connect(self.on_custom_dns_changed)
+            else:
+                self.custom_dns_edit.setEnabled(False)
+                # Set the DNS server in the tools
+                self.dns_tools.set_dns_server(text)
+
+    def on_custom_dns_changed(self, text):
+        """Handle custom DNS server input"""
+        if text.strip():
+            self.dns_tools.set_dns_server(text.strip())
+            self.info(f"Custom DNS server set: {text.strip()}")
         
     def handle_result(self, message, level):
         if level == "SUCCESS":
