@@ -12,6 +12,11 @@ class DNSTools(QObject):
     def __init__(self, logger):
         super().__init__()
         self.logger = logger
+        self.dns_server = None  # Will be set by the tab
+        
+    def set_dns_server(self, dns_server):
+        """Set the DNS server to use for lookups"""
+        self.dns_server = dns_server
         
     def forward_lookup(self, domain):
         """Forward DNS lookup (domain to IP)"""
@@ -66,19 +71,154 @@ class DNSTools(QObject):
         thread.daemon = True
         thread.start()
         
+    def a_lookup(self, domain):
+        """A record lookup (IPv4 addresses)"""
+        def _a_lookup():
+            try:
+                self.logger.debug(f"Starting A record lookup for {domain}")
+                
+                # Show which DNS server we're using
+                if self.dns_server and self.dns_server != "System Default":
+                    self.result_ready.emit(f"A record lookup for {domain} using {self.dns_server}...", "INFO")
+                else:
+                    self.result_ready.emit(f"A record lookup for {domain} using system DNS...", "INFO")
+                
+                # Use nslookup/dig for A records
+                import platform
+                cmd = []
+                
+                if platform.system().lower() == "windows":
+                    cmd = ["nslookup", "-type=A", domain]
+                    # Add DNS server if specified
+                    if self.dns_server and self.dns_server != "System Default":
+                        dns_ip = self._extract_dns_ip(self.dns_server)
+                        if dns_ip:
+                            cmd.append(dns_ip)
+                else:
+                    cmd = ["dig", "A", domain, "+short"]
+                    # Add DNS server if specified
+                    if self.dns_server and self.dns_server != "System Default":
+                        dns_ip = self._extract_dns_ip(self.dns_server)
+                        if dns_ip:
+                            cmd.extend(["@" + dns_ip])
+                
+                process = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+                
+                if process.returncode == 0 and process.stdout.strip():
+                    self.result_ready.emit("A Records (IPv4):", "SUCCESS")
+                    
+                    # Parse the output for clean display
+                    if platform.system().lower() == "windows":
+                        # Parse nslookup output more carefully
+                        lines = process.stdout.split('\n')
+                        found_addresses = False
+                        in_answer_section = False
+                        
+                        for line in lines:
+                            line = line.strip()
+                            
+                            # Skip server information at the top
+                            if line.startswith('Server:') or line.startswith('Address:') and not in_answer_section:
+                                continue
+                                
+                            # Look for the answer section
+                            if 'Name:' in line and domain in line:
+                                in_answer_section = True
+                                continue
+                                
+                            # Extract IP addresses from answer section
+                            if in_answer_section and 'Address:' in line:
+                                ip = line.split('Address:')[1].strip()
+                                if ip and '::' not in ip and self._is_valid_ipv4(ip):
+                                    self.result_ready.emit(f"  {ip}", "INFO")
+                                    found_addresses = True
+                        
+                        if not found_addresses:
+                            # Fallback: use socket for basic lookup
+                            try:
+                                ip = socket.gethostbyname(domain)
+                                self.result_ready.emit(f"  {ip}", "INFO")
+                            except:
+                                self.result_ready.emit("No A records found", "WARNING")
+                    else:
+                        # Parse dig output (already clean)
+                        ips = [line.strip() for line in process.stdout.split('\n') if line.strip()]
+                        found_addresses = False
+                        for ip in ips:
+                            if ip and '::' not in ip and self._is_valid_ipv4(ip):
+                                self.result_ready.emit(f"  {ip}", "INFO")
+                                found_addresses = True
+                        
+                        if not found_addresses:
+                            self.result_ready.emit("No A records found", "WARNING")
+                else:
+                    # Fallback to socket lookup
+                    try:
+                        ip = socket.gethostbyname(domain)
+                        self.result_ready.emit("A Records (IPv4):", "SUCCESS")
+                        self.result_ready.emit(f"  {ip} (via system resolver)", "INFO")
+                    except Exception as fallback_e:
+                        self.result_ready.emit("No A records found or lookup failed", "WARNING")
+                        if process.stderr:
+                            self.result_ready.emit(process.stderr.strip(), "ERROR")
+                        
+            except subprocess.TimeoutExpired:
+                self.result_ready.emit(f"A record lookup for {domain} timed out", "ERROR")
+            except Exception as e:
+                self.result_ready.emit(f"A record lookup error: {str(e)}", "ERROR")
+                
+        thread = threading.Thread(target=_a_lookup)
+        thread.daemon = True
+        thread.start()
+        
+    def _extract_dns_ip(self, dns_server_text):
+        """Extract IP address from DNS server selection text"""
+        import re
+        # Extract IP from text like "Google DNS (8.8.8.8)"
+        match = re.search(r'\(([0-9.]+)\)', dns_server_text)
+        if match:
+            return match.group(1)
+        # Check if it's already an IP address
+        if re.match(r'^[0-9.]+$', dns_server_text):
+            return dns_server_text
+        return None
+
+    def _is_valid_ipv4(self, ip):
+        """Check if string is a valid IPv4 address"""
+        try:
+            socket.inet_aton(ip)
+            return True
+        except socket.error:
+            return False
+
     def mx_lookup(self, domain):
         """MX record lookup"""
         def _mx_lookup():
             try:
                 self.logger.debug(f"Starting MX lookup for {domain}")
-                self.result_ready.emit(f"MX record lookup for {domain}...", "INFO")
+                
+                # Show which DNS server we're using
+                if self.dns_server and self.dns_server != "System Default":
+                    self.result_ready.emit(f"MX record lookup for {domain} using {self.dns_server}...", "INFO")
+                else:
+                    self.result_ready.emit(f"MX record lookup for {domain} using system DNS...", "INFO")
                 
                 # Use nslookup for MX records
                 import platform
+                cmd = []
+                
                 if platform.system().lower() == "windows":
                     cmd = ["nslookup", "-type=MX", domain]
+                    if self.dns_server and self.dns_server != "System Default":
+                        dns_ip = self._extract_dns_ip(self.dns_server)
+                        if dns_ip:
+                            cmd.append(dns_ip)
                 else:
                     cmd = ["dig", "MX", domain, "+short"]
+                    if self.dns_server and self.dns_server != "System Default":
+                        dns_ip = self._extract_dns_ip(self.dns_server)
+                        if dns_ip:
+                            cmd.extend(["@" + dns_ip])
                 
                 process = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
                 
@@ -104,14 +244,29 @@ class DNSTools(QObject):
         def _txt_lookup():
             try:
                 self.logger.debug(f"Starting TXT lookup for {domain}")
-                self.result_ready.emit(f"TXT record lookup for {domain}...", "INFO")
+                
+                # Show which DNS server we're using
+                if self.dns_server and self.dns_server != "System Default":
+                    self.result_ready.emit(f"TXT record lookup for {domain} using {self.dns_server}...", "INFO")
+                else:
+                    self.result_ready.emit(f"TXT record lookup for {domain} using system DNS...", "INFO")
                 
                 # Use nslookup for TXT records
                 import platform
+                cmd = []
+                
                 if platform.system().lower() == "windows":
                     cmd = ["nslookup", "-type=TXT", domain]
+                    if self.dns_server and self.dns_server != "System Default":
+                        dns_ip = self._extract_dns_ip(self.dns_server)
+                        if dns_ip:
+                            cmd.append(dns_ip)
                 else:
                     cmd = ["dig", "TXT", domain, "+short"]
+                    if self.dns_server and self.dns_server != "System Default":
+                        dns_ip = self._extract_dns_ip(self.dns_server)
+                        if dns_ip:
+                            cmd.extend(["@" + dns_ip])
                 
                 process = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
                 
@@ -145,14 +300,29 @@ class DNSTools(QObject):
         def _ns_lookup():
             try:
                 self.logger.debug(f"Starting NS lookup for {domain}")
-                self.result_ready.emit(f"NS record lookup for {domain}...", "INFO")
+                
+                # Show which DNS server we're using
+                if self.dns_server and self.dns_server != "System Default":
+                    self.result_ready.emit(f"NS record lookup for {domain} using {self.dns_server}...", "INFO")
+                else:
+                    self.result_ready.emit(f"NS record lookup for {domain} using system DNS...", "INFO")
                 
                 # Use nslookup for NS records
                 import platform
+                cmd = []
+                
                 if platform.system().lower() == "windows":
                     cmd = ["nslookup", "-type=NS", domain]
+                    if self.dns_server and self.dns_server != "System Default":
+                        dns_ip = self._extract_dns_ip(self.dns_server)
+                        if dns_ip:
+                            cmd.append(dns_ip)
                 else:
                     cmd = ["dig", "NS", domain, "+short"]
+                    if self.dns_server and self.dns_server != "System Default":
+                        dns_ip = self._extract_dns_ip(self.dns_server)
+                        if dns_ip:
+                            cmd.extend(["@" + dns_ip])
                 
                 process = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
                 
@@ -178,14 +348,29 @@ class DNSTools(QObject):
         def _cname_lookup():
             try:
                 self.logger.debug(f"Starting CNAME lookup for {domain}")
-                self.result_ready.emit(f"CNAME record lookup for {domain}...", "INFO")
+                
+                # Show which DNS server we're using
+                if self.dns_server and self.dns_server != "System Default":
+                    self.result_ready.emit(f"CNAME record lookup for {domain} using {self.dns_server}...", "INFO")
+                else:
+                    self.result_ready.emit(f"CNAME record lookup for {domain} using system DNS...", "INFO")
                 
                 # Use nslookup for CNAME records
                 import platform
+                cmd = []
+                
                 if platform.system().lower() == "windows":
                     cmd = ["nslookup", "-type=CNAME", domain]
+                    if self.dns_server and self.dns_server != "System Default":
+                        dns_ip = self._extract_dns_ip(self.dns_server)
+                        if dns_ip:
+                            cmd.append(dns_ip)
                 else:
                     cmd = ["dig", "CNAME", domain, "+short"]
+                    if self.dns_server and self.dns_server != "System Default":
+                        dns_ip = self._extract_dns_ip(self.dns_server)
+                        if dns_ip:
+                            cmd.extend(["@" + dns_ip])
                 
                 process = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
                 
@@ -211,14 +396,29 @@ class DNSTools(QObject):
         def _aaaa_lookup():
             try:
                 self.logger.debug(f"Starting AAAA lookup for {domain}")
-                self.result_ready.emit(f"AAAA record lookup for {domain}...", "INFO")
+                
+                # Show which DNS server we're using
+                if self.dns_server and self.dns_server != "System Default":
+                    self.result_ready.emit(f"AAAA record lookup for {domain} using {self.dns_server}...", "INFO")
+                else:
+                    self.result_ready.emit(f"AAAA record lookup for {domain} using system DNS...", "INFO")
                 
                 # Use nslookup for AAAA records
                 import platform
+                cmd = []
+                
                 if platform.system().lower() == "windows":
                     cmd = ["nslookup", "-type=AAAA", domain]
+                    if self.dns_server and self.dns_server != "System Default":
+                        dns_ip = self._extract_dns_ip(self.dns_server)
+                        if dns_ip:
+                            cmd.append(dns_ip)
                 else:
                     cmd = ["dig", "AAAA", domain, "+short"]
+                    if self.dns_server and self.dns_server != "System Default":
+                        dns_ip = self._extract_dns_ip(self.dns_server)
+                        if dns_ip:
+                            cmd.extend(["@" + dns_ip])
                 
                 process = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
                 
@@ -244,8 +444,10 @@ class DNSTools(QObject):
         def _all_records():
             self.result_ready.emit(f"=== Comprehensive DNS lookup for {domain} ===", "INFO")
             
-            # Run all lookups with small delays
+            # Run all lookups with small delays - including A record
             self.forward_lookup(domain)
+            time.sleep(1)
+            self.a_lookup(domain)
             time.sleep(1)
             self.mx_lookup(domain)
             time.sleep(1)

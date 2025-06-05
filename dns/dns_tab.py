@@ -45,18 +45,21 @@ class DNSTab(BaseTab):
         self.records_domain_edit.setPlaceholderText("Enter domain name")
         records_layout.addWidget(self.records_domain_edit, 0, 1, 1, 3)
         
-        # Record type buttons
+        # Record type buttons - now including A record
+        self.a_btn = QPushButton("A Records\n(IPv4)")
         self.mx_btn = QPushButton("MX Records\n(Mail)")
         self.txt_btn = QPushButton("TXT Records\n(SPF/DKIM)")
         self.ns_btn = QPushButton("NS Records\n(Name Servers)")
         self.cname_btn = QPushButton("CNAME Records\n(Aliases)")
         self.aaaa_btn = QPushButton("AAAA Records\n(IPv6)")
         
-        records_layout.addWidget(self.mx_btn, 1, 0)
-        records_layout.addWidget(self.txt_btn, 1, 1)
-        records_layout.addWidget(self.ns_btn, 1, 2)
-        records_layout.addWidget(self.cname_btn, 2, 0)
-        records_layout.addWidget(self.aaaa_btn, 2, 1)
+        # Arrange buttons in a 3x2 grid
+        records_layout.addWidget(self.a_btn, 1, 0)
+        records_layout.addWidget(self.mx_btn, 1, 1)
+        records_layout.addWidget(self.txt_btn, 1, 2)
+        records_layout.addWidget(self.ns_btn, 2, 0)
+        records_layout.addWidget(self.cname_btn, 2, 1)
+        records_layout.addWidget(self.aaaa_btn, 2, 2)
         
         layout.addWidget(records_group)
         
@@ -112,6 +115,7 @@ class DNSTab(BaseTab):
         trouble_info.setText(
             "DNS Troubleshooting Tips:\n"
             "• Use 'All Records' for comprehensive domain analysis\n"
+            "• Check A records for basic IPv4 resolution\n"
             "• Check MX records for email delivery issues\n"
             "• Verify SPF records in TXT lookup for email authentication\n"
             "• Compare results with different DNS servers"
@@ -195,7 +199,7 @@ class DNSTab(BaseTab):
         for btn in [self.forward_btn, self.reverse_btn, self.all_records_btn]:
             btn.setStyleSheet(main_button_style)
             
-        for btn in [self.mx_btn, self.txt_btn, self.ns_btn, self.cname_btn, self.aaaa_btn]:
+        for btn in [self.a_btn, self.mx_btn, self.txt_btn, self.ns_btn, self.cname_btn, self.aaaa_btn]:
             btn.setStyleSheet(record_button_style)
             
         for btn in [self.test_google_btn, self.test_ms_btn, self.test_github_btn, self.test_local_btn]:
@@ -207,7 +211,8 @@ class DNSTab(BaseTab):
         self.reverse_btn.clicked.connect(self.run_reverse_lookup)
         self.all_records_btn.clicked.connect(self.run_all_records)
         
-        # Record type connections
+        # Record type connections - including new A record button
+        self.a_btn.clicked.connect(self.run_a_lookup)
         self.mx_btn.clicked.connect(self.run_mx_lookup)
         self.txt_btn.clicked.connect(self.run_txt_lookup)
         self.ns_btn.clicked.connect(self.run_ns_lookup)
@@ -294,6 +299,19 @@ class DNSTab(BaseTab):
         # Re-enable button after delay
         from PyQt5.QtCore import QTimer
         QTimer.singleShot(10000, lambda: self.all_records_btn.setEnabled(True))
+    
+    def run_a_lookup(self):
+        """New A record lookup method"""
+        domain = self.records_domain_edit.text().strip()
+        if not domain:
+            self.error("Please enter a domain name")
+            return
+            
+        self.a_btn.setEnabled(False)
+        self.dns_tools.a_lookup(domain)
+        
+        from PyQt5.QtCore import QTimer
+        QTimer.singleShot(3000, lambda: self.a_btn.setEnabled(True))
     
     def run_mx_lookup(self):
         domain = self.records_domain_edit.text().strip()
