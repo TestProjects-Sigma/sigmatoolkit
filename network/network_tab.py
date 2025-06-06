@@ -210,7 +210,7 @@ class NetworkTab(BaseTab):
         ping_layout.addWidget(QLabel("Count:"), 0, 2)
         self.ping_count_spin = QSpinBox()
         self.ping_count_spin.setRange(1, 100)
-        self.ping_count_spin.setValue(4)
+        self.ping_count_spin.setValue(1)
         ping_layout.addWidget(self.ping_count_spin, 0, 3)
         
         self.ping_btn = QPushButton("Ping")

@@ -15,9 +15,11 @@ class ServiceMonitorTab(BaseTab):
         super().__init__(logger)
         self.services_tools = ServicesTools(logger)
         self.auto_refresh_timer = QTimer()
+        self.config_file_path = "service_config.json"  # Default config file
         self.init_ui()
         self.setup_connections()
         self.load_default_services()
+        self.auto_load_config()  # Auto-load saved configuration
         
     def init_ui(self):
         layout = QVBoxLayout(self)
@@ -31,12 +33,16 @@ class ServiceMonitorTab(BaseTab):
         
         self.refresh_btn = QPushButton("🔄 Refresh All")
         self.auto_refresh_cb = QCheckBox("Auto-refresh (30s)")
+        self.save_config_btn = QPushButton("💾 Save Config")
+        self.load_config_btn = QPushButton("📁 Load Config")
         self.add_service_btn = QPushButton("➕ Add Service")
         self.edit_service_btn = QPushButton("✏️ Edit Service")
         self.remove_service_btn = QPushButton("🗑️ Remove Service")
         
         control_layout.addWidget(self.refresh_btn)
         control_layout.addWidget(self.auto_refresh_cb)
+        control_layout.addWidget(self.save_config_btn)
+        control_layout.addWidget(self.load_config_btn)
         control_layout.addStretch()
         control_layout.addWidget(self.add_service_btn)
         control_layout.addWidget(self.edit_service_btn)
@@ -85,12 +91,12 @@ class ServiceMonitorTab(BaseTab):
             {"name": "OneDrive", "url": "https://onedrive.live.com"}
         ])
         
-        # Google Workspace Category
-        google_frame = self.create_category_frame("Google Workspace", [
-            {"name": "Gmail", "url": "https://mail.google.com"},
-            {"name": "Google Drive", "url": "https://drive.google.com"},
-            {"name": "Google Meet", "url": "https://meet.google.com"},
-            {"name": "Google Calendar", "url": "https://calendar.google.com"}
+        # Infrastructure Category
+        infra_frame = self.create_category_frame("Infrastructure", [
+            {"name": "Google DNS", "url": "8.8.8.8"},
+            {"name": "Cloudflare DNS", "url": "1.1.1.1"},
+            {"name": "Quad9 DNS", "url": "9.9.9.9"},
+            {"name": "OpenDNS", "url": "208.67.222.222"}
         ])
         
         # Cloud Providers Category
@@ -102,7 +108,7 @@ class ServiceMonitorTab(BaseTab):
         ])
         
         categories_layout.addWidget(ms365_frame)
-        categories_layout.addWidget(google_frame)
+        categories_layout.addWidget(infra_frame)
         categories_layout.addWidget(cloud_frame)
         categories_layout.addStretch()
         
@@ -198,9 +204,9 @@ class ServiceMonitorTab(BaseTab):
         guide_text.setReadOnly(True)
         guide_text.setText(
             "Service Monitoring Tips:\n"
-            "• Add custom services with specific health check endpoints\n"
-            "• Use auto-refresh for continuous monitoring • Check response times for performance issues\n"
-            "• Configure different check types (HTTP, Ping, Port, DNS) • Export status reports for documentation"
+            "• Services are automatically saved when added or removed\n"
+            "• Use 💾 Save Config to backup your configuration • Use 📁 Load Config to restore or import services\n"
+            "• Enable auto-refresh for continuous monitoring • Configure different check types for specific needs"
         )
         guide_layout.addWidget(guide_text)
         
@@ -325,6 +331,24 @@ class ServiceMonitorTab(BaseTab):
         for btn in [self.refresh_btn, self.add_custom_btn, self.test_custom_btn]:
             btn.setStyleSheet(main_button_style)
             
+        for btn in [self.save_config_btn, self.load_config_btn]:
+            btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #8764b8;
+                    color: white;
+                    border: none;
+                    padding: 6px 12px;
+                    border-radius: 4px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #7356a1;
+                }
+                QPushButton:pressed {
+                    background-color: #5f478a;
+                }
+            """)
+            
         for btn in [self.add_service_btn, self.edit_service_btn, self.remove_service_btn]:
             btn.setStyleSheet(management_button_style)
         
@@ -332,6 +356,8 @@ class ServiceMonitorTab(BaseTab):
         # Main control connections
         self.refresh_btn.clicked.connect(self.refresh_all_services)
         self.auto_refresh_cb.toggled.connect(self.toggle_auto_refresh)
+        self.save_config_btn.clicked.connect(self.save_service_config)
+        self.load_config_btn.clicked.connect(self.load_service_config)
         self.add_service_btn.clicked.connect(self.add_service_dialog)
         self.edit_service_btn.clicked.connect(self.edit_service_dialog)
         self.remove_service_btn.clicked.connect(self.remove_service)
@@ -380,6 +406,7 @@ class ServiceMonitorTab(BaseTab):
         self.info(f"Adding {name} to monitoring...")
         self.services_tools.add_service(name, url, "http", category)
         self.update_service_tree()
+        self.auto_save_config()  # Auto-save after adding
         self.success(f"✅ {name} added to service monitoring")
         
     def add_category_services(self, category_name, services):
@@ -392,6 +419,7 @@ class ServiceMonitorTab(BaseTab):
             )
         
         self.update_service_tree()
+        self.auto_save_config()  # Auto-save after adding multiple services
         self.success(f"✅ Added all {category_name} services ({len(services)} total)")
         
     def add_custom_service(self):
@@ -424,6 +452,7 @@ class ServiceMonitorTab(BaseTab):
         self.service_url_edit.clear()
         
         self.update_service_tree()
+        self.auto_save_config()  # Auto-save after adding custom service
         self.success(f"✅ Custom service '{name}' added successfully")
         
     def test_custom_service(self):
@@ -591,6 +620,7 @@ class ServiceMonitorTab(BaseTab):
             if reply == QMessageBox.Yes:
                 self.services_tools.remove_service(service_name)
                 self.update_service_tree()
+                self.auto_save_config()  # Auto-save after removing
                 self.success(f"✅ Service '{service_name}' removed from monitoring")
         else:
             self.warning("Please select a service (not a category)")
@@ -601,3 +631,96 @@ class ServiceMonitorTab(BaseTab):
         if selected_items and selected_items[0].parent():
             service_name = selected_items[0].text(0)
             self.info(f"Selected service: {service_name}")
+            
+    def auto_save_config(self):
+        """Automatically save the current configuration"""
+        try:
+            success = self.services_tools.save_services_to_config(self.config_file_path)
+            if success:
+                self.debug(f"Configuration auto-saved to {self.config_file_path}")
+            else:
+                self.debug("Auto-save failed")
+        except Exception as e:
+            self.debug(f"Auto-save error: {str(e)}")
+            
+    def auto_load_config(self):
+        """Automatically load configuration if it exists"""
+        try:
+            import os
+            if os.path.exists(self.config_file_path):
+                success = self.services_tools.load_services_from_config(self.config_file_path)
+                if success:
+                    self.update_service_tree()
+                    self.info(f"📁 Loaded previous configuration ({len(self.services_tools.services)} services)")
+                else:
+                    self.debug("Auto-load failed")
+            else:
+                self.debug("No previous configuration found")
+        except Exception as e:
+            self.debug(f"Auto-load error: {str(e)}")
+            
+    def save_service_config(self):
+        """Save service configuration to file with dialog"""
+        try:
+            from PyQt5.QtWidgets import QFileDialog
+            file_path, _ = QFileDialog.getSaveFileName(
+                self,
+                "Save Service Configuration",
+                f"service_config_{self.get_current_time().replace(':', '-')}.json",
+                "JSON Files (*.json);;All Files (*)"
+            )
+            
+            if file_path:
+                success = self.services_tools.save_services_to_config(file_path)
+                if success:
+                    self.success(f"💾 Configuration saved to: {file_path}")
+                    # Also update the default config file
+                    self.services_tools.save_services_to_config(self.config_file_path)
+                else:
+                    self.error("Failed to save configuration")
+                    
+        except Exception as e:
+            self.error(f"Save configuration failed: {str(e)}")
+            
+    def load_service_config(self):
+        """Load service configuration from file with dialog"""
+        try:
+            from PyQt5.QtWidgets import QFileDialog, QMessageBox
+            file_path, _ = QFileDialog.getOpenFileName(
+                self,
+                "Load Service Configuration",
+                "",
+                "JSON Files (*.json);;All Files (*)"
+            )
+            
+            if file_path:
+                # Ask if user wants to replace current services or add to them
+                reply = QMessageBox.question(
+                    self,
+                    "Load Configuration",
+                    "Do you want to replace current services with the loaded configuration?\n\n"
+                    "Choose 'Yes' to replace all services\n"
+                    "Choose 'No' to add to existing services",
+                    QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+                    QMessageBox.No
+                )
+                
+                if reply == QMessageBox.Cancel:
+                    return
+                    
+                if reply == QMessageBox.Yes:
+                    # Clear existing services
+                    self.services_tools.services.clear()
+                    self.services_tools.last_check_results.clear()
+                    
+                success = self.services_tools.load_services_from_config(file_path)
+                if success:
+                    self.update_service_tree()
+                    self.auto_save_config()  # Save to default config
+                    action = "replaced" if reply == QMessageBox.Yes else "added to"
+                    self.success(f"📁 Configuration loaded and {action} current services")
+                else:
+                    self.error("Failed to load configuration")
+                    
+        except Exception as e:
+            self.error(f"Load configuration failed: {str(e)}")
