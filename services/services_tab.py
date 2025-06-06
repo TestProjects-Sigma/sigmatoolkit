@@ -32,6 +32,7 @@ class ServiceMonitorTab(BaseTab):
         control_layout = QHBoxLayout()
         
         self.refresh_btn = QPushButton("🔄 Refresh All")
+        self.test_selected_btn = QPushButton("🧪 Test Selected")
         self.auto_refresh_cb = QCheckBox("Auto-refresh (30s)")
         self.save_config_btn = QPushButton("💾 Save Config")
         self.load_config_btn = QPushButton("📁 Load Config")
@@ -40,6 +41,7 @@ class ServiceMonitorTab(BaseTab):
         self.remove_service_btn = QPushButton("🗑️ Remove Service")
         
         control_layout.addWidget(self.refresh_btn)
+        control_layout.addWidget(self.test_selected_btn)
         control_layout.addWidget(self.auto_refresh_cb)
         control_layout.addWidget(self.save_config_btn)
         control_layout.addWidget(self.load_config_btn)
@@ -56,6 +58,10 @@ class ServiceMonitorTab(BaseTab):
             "Service", "Status", "Response Time", "Last Checked", "Details"
         ])
         self.service_tree.setMinimumHeight(300)
+        
+        # Enable context menu for individual service actions
+        self.service_tree.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.service_tree.customContextMenuRequested.connect(self.show_service_context_menu)
         
         # Style the tree
         self.service_tree.setStyleSheet("""
@@ -204,9 +210,9 @@ class ServiceMonitorTab(BaseTab):
         guide_text.setReadOnly(True)
         guide_text.setText(
             "Service Monitoring Tips:\n"
-            "• Services are automatically saved when added or removed\n"
-            "• Use 💾 Save Config to backup your configuration • Use 📁 Load Config to restore or import services\n"
-            "• Enable auto-refresh for continuous monitoring • Configure different check types for specific needs"
+            "• Right-click services for individual testing and management\n"
+            "• Use 🧪 Test Selected button to test only the selected service\n"
+            "• Services are automatically saved when added or removed • Enable auto-refresh for continuous monitoring"
         )
         guide_layout.addWidget(guide_text)
         
@@ -331,6 +337,29 @@ class ServiceMonitorTab(BaseTab):
         for btn in [self.refresh_btn, self.add_custom_btn, self.test_custom_btn]:
             btn.setStyleSheet(main_button_style)
             
+        # Test selected button style (special orange color)
+        self.test_selected_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #ff8c00;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-weight: bold;
+                min-height: 30px;
+            }
+            QPushButton:hover {
+                background-color: #e67300;
+            }
+            QPushButton:pressed {
+                background-color: #cc6600;
+            }
+            QPushButton:disabled {
+                background-color: #cccccc;
+                color: #666666;
+            }
+        """)
+            
         for btn in [self.save_config_btn, self.load_config_btn]:
             btn.setStyleSheet("""
                 QPushButton {
@@ -355,6 +384,7 @@ class ServiceMonitorTab(BaseTab):
     def setup_connections(self):
         # Main control connections
         self.refresh_btn.clicked.connect(self.refresh_all_services)
+        self.test_selected_btn.clicked.connect(self.test_selected_service)
         self.auto_refresh_cb.toggled.connect(self.toggle_auto_refresh)
         self.save_config_btn.clicked.connect(self.save_service_config)
         self.load_config_btn.clicked.connect(self.load_service_config)
@@ -628,9 +658,217 @@ class ServiceMonitorTab(BaseTab):
     def on_service_selected(self):
         """Handle service selection in tree"""
         selected_items = self.service_tree.selectedItems()
-        if selected_items and selected_items[0].parent():
+        has_service_selected = selected_items and selected_items[0].parent() is not None
+        
+        # Enable/disable Test Selected button based on selection
+        self.test_selected_btn.setEnabled(has_service_selected)
+        
+        if has_service_selected:
             service_name = selected_items[0].text(0)
             self.info(f"Selected service: {service_name}")
+            
+    def test_selected_service(self):
+        """Test only the selected service"""
+        selected_items = self.service_tree.selectedItems()
+        if not selected_items:
+            self.warning("Please select a service to test")
+            return
+            
+        item = selected_items[0]
+        if not item.parent():  # Make sure it's a service, not a category
+            self.warning("Please select a service (not a category)")
+            return
+            
+        service_name = item.text(0)
+        self.info(f"🧪 Testing selected service: {service_name}")
+        
+        # Find the service in our services dictionary
+        service_to_test = None
+        for service_id, service in self.services_tools.services.items():
+            if service["name"] == service_name:
+                service_to_test = service
+                break
+                
+        if service_to_test:
+            self.test_selected_btn.setEnabled(False)
+            self.test_selected_btn.setText("🧪 Testing...")
+            
+            # Update the service status to show it's being tested
+            item.setText(1, "🔄 Testing...")
+            item.setBackground(1, QColor(255, 255, 224))  # Light yellow background
+            
+            # Test the single service
+            def _test_single():
+                self.services_tools._check_single_service(service_to_test)
+                
+            import threading
+            thread = threading.Thread(target=_test_single)
+            thread.daemon = True
+            thread.start()
+            
+            # Re-enable button after delay
+            from PyQt5.QtCore import QTimer
+            QTimer.singleShot(5000, self.restore_test_selected_button)
+        else:
+            self.error(f"Could not find service configuration for: {service_name}")
+            
+    def restore_test_selected_button(self):
+        """Restore test selected button state"""
+        self.test_selected_btn.setEnabled(True)
+        self.test_selected_btn.setText("🧪 Test Selected")
+        
+    def show_service_context_menu(self, position):
+        """Show context menu for service tree items"""
+        item = self.service_tree.itemAt(position)
+        if not item:
+            return
+            
+        from PyQt5.QtWidgets import QMenu, QAction
+        menu = QMenu()
+        
+        if item.parent():  # It's a service item
+            service_name = item.text(0)
+            
+            # Test service action
+            test_action = QAction("🧪 Test This Service", self)
+            test_action.triggered.connect(lambda: self.test_single_service_by_name(service_name))
+            menu.addAction(test_action)
+            
+            menu.addSeparator()
+            
+            # Copy service info action
+            copy_action = QAction("📋 Copy Service Info", self)
+            copy_action.triggered.connect(lambda: self.copy_service_info(service_name))
+            menu.addAction(copy_action)
+            
+            # Edit service action
+            edit_action = QAction("✏️ Edit Service", self)
+            edit_action.triggered.connect(lambda: self.edit_specific_service(service_name))
+            menu.addAction(edit_action)
+            
+            menu.addSeparator()
+            
+            # Remove service action
+            remove_action = QAction("🗑️ Remove Service", self)
+            remove_action.triggered.connect(lambda: self.remove_specific_service(service_name))
+            menu.addAction(remove_action)
+            
+        else:  # It's a category item
+            category_name = item.text(0).replace("📁 ", "")
+            
+            # Test all services in category
+            test_category_action = QAction(f"🧪 Test All {category_name}", self)
+            test_category_action.triggered.connect(lambda: self.test_category_services(category_name))
+            menu.addAction(test_category_action)
+            
+            # Expand/collapse category
+            if item.isExpanded():
+                collapse_action = QAction("📁 Collapse Category", self)
+                collapse_action.triggered.connect(lambda: item.setExpanded(False))
+                menu.addAction(collapse_action)
+            else:
+                expand_action = QAction("📂 Expand Category", self)
+                expand_action.triggered.connect(lambda: item.setExpanded(True))
+                menu.addAction(expand_action)
+        
+        # Show the context menu
+        menu.exec_(self.service_tree.mapToGlobal(position))
+        
+    def test_single_service_by_name(self, service_name):
+        """Test a single service by name (used by context menu)"""
+        # Find and select the service in the tree first
+        root = self.service_tree.invisibleRootItem()
+        for i in range(root.childCount()):
+            category_item = root.child(i)
+            for j in range(category_item.childCount()):
+                service_item = category_item.child(j)
+                if service_item.text(0) == service_name:
+                    self.service_tree.setCurrentItem(service_item)
+                    self.test_selected_service()
+                    return
+        
+        self.error(f"Could not find service: {service_name}")
+        
+    def copy_service_info(self, service_name):
+        """Copy service information to clipboard"""
+        # Find the service configuration
+        service_config = None
+        for service_id, service in self.services_tools.services.items():
+            if service["name"] == service_name:
+                service_config = service
+                break
+                
+        if service_config:
+            from PyQt5.QtWidgets import QApplication
+            clipboard = QApplication.clipboard()
+            
+            # Get the latest status
+            service_key = f"{service_config['category']}_{service_name}".replace(" ", "_")
+            result = self.services_tools.last_check_results.get(service_key, {})
+            
+            service_info = f"""Service: {service_name}
+URL: {service_config['url']}
+Type: {service_config['type']}
+Category: {service_config['category']}
+Status: {result.get('status', 'Unknown')}
+Response Time: {result.get('response_time', 0):.0f}ms
+Last Checked: {result.get('last_checked', 'Never')}
+Details: {result.get('details', 'N/A')}"""
+            
+            clipboard.setText(service_info)
+            self.success(f"📋 Service info copied for: {service_name}")
+        else:
+            self.error(f"Could not find service configuration for: {service_name}")
+            
+    def edit_specific_service(self, service_name):
+        """Edit a specific service (placeholder for future implementation)"""
+        self.info(f"✏️ Edit service: {service_name}")
+        self.info("💡 Full editing dialog will be implemented in future version")
+        
+    def remove_specific_service(self, service_name):
+        """Remove a specific service"""
+        from PyQt5.QtWidgets import QMessageBox
+        reply = QMessageBox.question(
+            self, 
+            "Remove Service",
+            f"Are you sure you want to remove '{service_name}' from monitoring?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        
+        if reply == QMessageBox.Yes:
+            self.services_tools.remove_service(service_name)
+            self.update_service_tree()
+            self.auto_save_config()
+            self.success(f"✅ Service '{service_name}' removed from monitoring")
+            
+    def test_category_services(self, category_name):
+        """Test all services in a specific category"""
+        self.info(f"🧪 Testing all services in category: {category_name}")
+        
+        # Find all services in the category
+        services_to_test = []
+        for service_id, service in self.services_tools.services.items():
+            if service["category"] == category_name and service["enabled"]:
+                services_to_test.append(service)
+        
+        if not services_to_test:
+            self.warning(f"No enabled services found in category: {category_name}")
+            return
+            
+        self.info(f"Testing {len(services_to_test)} services in {category_name}...")
+        
+        # Test each service in the category
+        def _test_category():
+            for service in services_to_test:
+                self.services_tools._check_single_service(service)
+                import time
+                time.sleep(0.5)  # Small delay between tests
+                
+        import threading
+        thread = threading.Thread(target=_test_category)
+        thread.daemon = True
+        thread.start()
             
     def auto_save_config(self):
         """Automatically save the current configuration"""
