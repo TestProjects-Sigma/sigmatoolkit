@@ -1,0 +1,46 @@
+{
+  "services": [
+    {
+      "name": "Microsoft 365 Login",
+      "url": "https://login.microsoftonline.com",
+      "type": "http",
+      "category": "Microsoft 365"
+    },
+    {
+      "name": "Exchange Online",
+      "url": "https://outlook.office365.com",
+      "type": "http",
+      "category": "Microsoft 365"
+    },
+    {
+      "name": "SharePoint Online",
+      "url": "https://admin.microsoft.com",
+      "type": "http",
+      "category": "Microsoft 365"
+    },
+    {
+      "name": "Google DNS",
+      "url": "8.8.8.8",
+      "type": "ping",
+      "category": "Infrastructure"
+    },
+    {
+      "name": "Cloudflare DNS",
+      "url": "1.1.1.1",
+      "type": "ping",
+      "category": "Infrastructure"
+    },
+    {
+      "name": "AWS Console",
+      "url": "https://console.aws.amazon.com",
+      "type": "http",
+      "category": "Cloud Providers"
+    },
+    {
+      "name": "Azure Portal",
+      "url": "https://portal.azure.com",
+      "type": "http",
+      "category": "Cloud Providers"
+    }
+  ]
+}
