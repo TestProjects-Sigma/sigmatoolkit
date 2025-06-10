@@ -52,12 +52,7 @@ class MainWindow(QMainWindow):
         
         # Create tab widget
         self.tab_widget = QTabWidget()
-        
-        # Add Service Monitor tab (FIRST for priority)
-        if SERVICES_TAB_AVAILABLE:
-            self.services_tab = ServiceMonitorTab(self.logger)
-            self.tab_widget.addTab(self.services_tab, "🟢 Service Monitor")
-        
+             
         # Add Network tab
         self.network_tab = NetworkTab(self.logger)
         self.tab_widget.addTab(self.network_tab, "🌐 Network Testing")
@@ -65,6 +60,11 @@ class MainWindow(QMainWindow):
         # Add DNS tab
         self.dns_tab = DNSTab(self.logger)
         self.tab_widget.addTab(self.dns_tab, "🔍 DNS Testing")
+
+        # Add Service Monitor tab
+        if SERVICES_TAB_AVAILABLE:
+            self.services_tab = ServiceMonitorTab(self.logger)
+            self.tab_widget.addTab(self.services_tab, "🟢 Service Monitor")
         
         # Add SMTP tab
         self.smtp_tab = SMTPTab(self.logger)
@@ -251,7 +251,7 @@ class MainWindow(QMainWindow):
         
         if SERVICES_TAB_AVAILABLE:
             service_monitor_action = QAction('Service Monitor', self)
-            service_monitor_action.triggered.connect(lambda: self.tab_widget.setCurrentIndex(0))
+            service_monitor_action.triggered.connect(lambda: self.tab_widget.setCurrentIndex(2))
             tools_menu.addAction(service_monitor_action)
             tools_menu.addSeparator()
         
