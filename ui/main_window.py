@@ -1,4 +1,4 @@
-# ui/main_window.py - UPDATED WITH SERVICE MONITOR
+# ui/main_window.py - UPDATED WITH PORT LISTENER
 from PyQt5.QtWidgets import (QMainWindow, QTabWidget, QVBoxLayout, 
                             QWidget, QMenuBar, QAction, QMessageBox,
                             QSplitter, QTextEdit, QHBoxLayout, QPushButton,
@@ -10,6 +10,14 @@ from network.network_tab import NetworkTab
 from dns.dns_tab import DNSTab
 from smtp.smtp_tab import SMTPTab
 from speedtest.speedtest_tab import SpeedTestTab
+
+# Try to import the port listener tab
+try:
+    from portlistener.port_listener_tab import PortListenerTab
+    PORT_LISTENER_TAB_AVAILABLE = True
+except ImportError:
+    PORT_LISTENER_TAB_AVAILABLE = False
+    print("⚠️ Port Listener tab not available - create portlistener module first")
 
 # Try to import the mail tab, but handle gracefully if not available
 try:
@@ -32,7 +40,9 @@ from core.logger import Logger
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.version = "1.5.0" if SERVICES_TAB_AVAILABLE else ("1.4.0" if MAIL_TAB_AVAILABLE else "1.3.0")
+        # Update version based on available features
+        version_base = "1.5.0" if SERVICES_TAB_AVAILABLE else ("1.4.0" if MAIL_TAB_AVAILABLE else "1.3.0")
+        self.version = f"{version_base}.1" if PORT_LISTENER_TAB_AVAILABLE else version_base
         self.logger = Logger()
         self.init_ui()
         
@@ -69,6 +79,11 @@ class MainWindow(QMainWindow):
         # Add SMTP tab
         self.smtp_tab = SMTPTab(self.logger)
         self.tab_widget.addTab(self.smtp_tab, "📧 SMTP Testing")
+        
+        # Add Port Listener tab (NEW)
+        if PORT_LISTENER_TAB_AVAILABLE:
+            self.port_listener_tab = PortListenerTab(self.logger)
+            self.tab_widget.addTab(self.port_listener_tab, "🔌 Port Listener")
         
         # Add Speedtest tab
         self.speedtest_tab = SpeedTestTab(self.logger)
@@ -198,8 +213,12 @@ class MainWindow(QMainWindow):
         """Delayed welcome message"""
         self.logger.info(f"🎉 Welcome to SigmaToolkit v{self.version}!")
         
+        if PORT_LISTENER_TAB_AVAILABLE:
+            self.logger.info("🔌 NEW: Port Listener tab for firewall testing and connection monitoring")
+            self.logger.info("⚡ Test firewall ports, monitor connections, and validate network access")
+        
         if SERVICES_TAB_AVAILABLE:
-            self.logger.info("🟢 NEW: Service Monitor tab with Microsoft 365, cloud services, and custom monitoring")
+            self.logger.info("🟢 Service Monitor: Microsoft 365, cloud services, and custom monitoring")
             self.logger.info("📊 Monitor Microsoft 365, Google Workspace, AWS, Azure, and custom services")
             self.logger.info("🔄 Auto-refresh, real-time status, and comprehensive health checks")
         
@@ -208,13 +227,23 @@ class MainWindow(QMainWindow):
         else:
             self.logger.warning("📨 Mail Analysis tab not available")
             
+        # Update toolkit description based on available features
+        toolkit_description = "🔍 Complete toolkit: "
+        tabs = []
+        
         if SERVICES_TAB_AVAILABLE:
-            self.logger.info("🔍 Complete toolkit: Service Monitor → Network → DNS → SMTP → Speed → Mail")
-        else:
-            self.logger.info("🔍 Current toolkit: Network → DNS → SMTP → Speed Testing")
-            self.logger.info("💡 To enable Service Monitor: Create services module")
+            tabs.append("Service Monitor")
+        tabs.extend(["Network", "DNS", "SMTP"])
+        if PORT_LISTENER_TAB_AVAILABLE:
+            tabs.append("Port Listener")
+        tabs.append("Speed")
+        if MAIL_TAB_AVAILABLE:
+            tabs.append("Mail")
             
-        self.logger.info("💡 Ready for comprehensive IT infrastructure monitoring!")
+        toolkit_description += " → ".join(tabs)
+        self.logger.info(toolkit_description)
+            
+        self.logger.info("💡 Ready for comprehensive IT infrastructure monitoring and testing!")
         
     def setup_connections(self):
         self.clear_btn.clicked.connect(self.clear_output)
@@ -255,9 +284,23 @@ class MainWindow(QMainWindow):
             tools_menu.addAction(service_monitor_action)
             tools_menu.addSeparator()
         
+        # Add Port Listener menu item
+        if PORT_LISTENER_TAB_AVAILABLE:
+            port_listener_action = QAction('Port Listener', self)
+            # Calculate the correct tab index based on available tabs
+            tab_index = 3  # Default position (Network, DNS, SMTP, Port Listener)
+            if SERVICES_TAB_AVAILABLE:
+                tab_index = 4  # (Network, DNS, Services, SMTP, Port Listener)
+            port_listener_action.triggered.connect(lambda: self.tab_widget.setCurrentIndex(tab_index))
+            tools_menu.addAction(port_listener_action)
+            tools_menu.addSeparator()
+        
         if MAIL_TAB_AVAILABLE:
             mail_analysis_action = QAction('Mail Header Analysis', self)
+            # Calculate correct tab index for mail tab
             tab_index = 5 if SERVICES_TAB_AVAILABLE else 4
+            if PORT_LISTENER_TAB_AVAILABLE:
+                tab_index += 1
             mail_analysis_action.triggered.connect(lambda: self.tab_widget.setCurrentIndex(tab_index))
             tools_menu.addAction(mail_analysis_action)
             tools_menu.addSeparator()
@@ -272,6 +315,11 @@ class MainWindow(QMainWindow):
         about_action = QAction('About', self)
         about_action.triggered.connect(self.show_about)
         help_menu.addAction(about_action)
+        
+        if PORT_LISTENER_TAB_AVAILABLE:
+            port_help_action = QAction('Port Listener Help', self)
+            port_help_action.triggered.connect(self.show_port_listener_help)
+            help_menu.addAction(port_help_action)
         
         if SERVICES_TAB_AVAILABLE:
             service_help_action = QAction('Service Monitor Help', self)
@@ -400,6 +448,17 @@ class MainWindow(QMainWindow):
                         f.write(f"Warning: {summary['warning']}\n")
                         f.write(f"Critical: {summary['critical']}\n\n")
                     
+                    # Export port listener stats if available
+                    if PORT_LISTENER_TAB_AVAILABLE and hasattr(self, 'port_listener_tab'):
+                        if self.port_listener_tab.is_listening:
+                            f.write("PORT LISTENER STATUS:\n")
+                            f.write("-" * 20 + "\n")
+                            stats = self.port_listener_tab.port_tools.get_statistics()
+                            f.write(f"Status: Active\n")
+                            f.write(f"Connections: {stats['connections']}\n")
+                            f.write(f"Last Client: {stats.get('last_client', 'None')}\n")
+                            f.write(f"Uptime: {stats['uptime']}\n\n")
+                    
                     # Export output log
                     f.write("CONSOLE OUTPUT:\n")
                     f.write("-" * 20 + "\n")
@@ -412,7 +471,8 @@ class MainWindow(QMainWindow):
             self.logger.error(f"Export failed: {str(e)}")
         
     def show_about(self):
-        features_text = """• Service Monitor (Microsoft 365, Google Workspace, AWS, Azure, Custom Services)
+        features_text = """• Port Listener (Firewall Testing, Connection Monitoring, Network Validation)
+• Service Monitor (Microsoft 365, Google Workspace, AWS, Azure, Custom Services)
 • Network Testing (Ping, Traceroute, Port Scan)
 • DNS Testing (Forward/Reverse, MX, SPF, TXT, NS, CNAME, AAAA)
 • SMTP Testing (Connection, Auth, Email Sending, MX Validation)
@@ -425,12 +485,17 @@ class MainWindow(QMainWindow):
         features_text += """
 • Debug logging and easy result copying"""
 
-        version_history = """v1.5.0 - Added comprehensive service monitoring with Microsoft 365, cloud providers, and custom services
+        version_history = """v1.5.1 - Added Port Listener for firewall testing and connection monitoring
+v1.5.0 - Added comprehensive service monitoring with Microsoft 365, cloud providers, and custom services
 v1.4.0 - Added comprehensive mail header analysis and email authentication
 v1.3.0 - Added comprehensive speed testing with real-time displays
 v1.2.0 - Added SMTP testing capabilities
 v1.1.0 - Added DNS testing capabilities
 v1.0.0 - Initial release with network tools"""
+
+        # Filter version history based on available features
+        if not PORT_LISTENER_TAB_AVAILABLE:
+            version_history = version_history.replace("v1.5.1 - Added Port Listener for firewall testing and connection monitoring\n", "")
 
         if not SERVICES_TAB_AVAILABLE:
             version_history = version_history.replace("v1.5.0 - Added comprehensive service monitoring with Microsoft 365, cloud providers, and custom services\n", "")
@@ -446,6 +511,72 @@ v1.0.0 - Initial release with network tools"""
                          f"Features:\n{features_text}\n\n"
                          f"Version History:\n{version_history}\n\n"
                          "Created for efficient IT troubleshooting and infrastructure monitoring workflows.")
+    
+    def show_port_listener_help(self):
+        """Show help for port listener features"""
+        if not PORT_LISTENER_TAB_AVAILABLE:
+            QMessageBox.information(self, "Port Listener Not Available", 
+                                  "The Port Listener feature is not currently available.\n\n"
+                                  "To enable this feature:\n"
+                                  "1. Create the portlistener module directory\n"
+                                  "2. Add the port_listener_tab.py and port_listener_tools.py files\n"
+                                  "3. Restart SigmaToolkit\n\n"
+                                  "The Port Listener provides firewall testing and connection monitoring.")
+            return
+            
+        help_text = """🔌 PORT LISTENER HELP
+
+The Port Listener tab provides comprehensive firewall testing and connection monitoring:
+
+🔧 CONFIGURATION:
+• IP Address: Use 0.0.0.0 for all interfaces or specific IP
+• Port: Any port 1-65535 (ports < 1024 require admin privileges)
+• Response Type: HTTP OK, Echo, or Silent modes
+
+⚠️ FIREWALL REQUIREMENTS:
+• Windows Firewall must allow inbound connections on the specified port
+• Administrator privileges required for ports below 1024
+• Create firewall rules or temporarily disable firewall for testing
+
+🎮 OPERATION:
+• Start/Stop: Toggle listening state with real-time status
+• Test Connection: Verify connectivity to your own listener
+• Connection Log: Monitor all incoming connections with timestamps
+
+📊 MONITORING:
+• Real-time connection counting and client tracking
+• Uptime monitoring with precise timing
+• Last client IP and connection statistics
+
+🔍 RESPONSE TYPES:
+• HTTP OK: Sends HTTP 200 response (web-compatible)
+• Echo: Returns received data back to client
+• Silent: Accepts connections but sends no response
+
+🧪 TESTING:
+• Use telnet: telnet your-server-ip port-number
+• Use curl: curl http://your-server-ip:port-number
+• Use browser for HTTP responses
+• Check with nmap or other port scanners
+
+💡 USE CASES:
+• Test firewall rules and port accessibility
+• Verify network connectivity through corporate firewalls
+• Monitor unauthorized connection attempts
+• Validate load balancer and reverse proxy configurations
+• Debug network infrastructure issues
+
+🛡️ SECURITY:
+• Monitor who's connecting to your test ports
+• Detect port scanning and unauthorized access attempts
+• Use for penetration testing and security assessments"""
+        
+        msg = QMessageBox()
+        msg.setWindowTitle("Port Listener Help")
+        msg.setText("Port Listener Help")
+        msg.setDetailedText(help_text)
+        msg.setIcon(QMessageBox.Information)
+        msg.exec_()
     
     def show_service_help(self):
         """Show help for service monitoring features"""
