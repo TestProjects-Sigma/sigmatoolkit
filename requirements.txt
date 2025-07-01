@@ -1,4 +1,17 @@
+# SigmaToolkit Requirements
+# Core GUI Framework
 PyQt5==5.15.10
+
+# Network and System Tools
 python-nmap==0.7.1
 requests==2.31.0
 speedtest-cli==2.1.3
+
+# Active Directory Password Checker Dependencies
+ldap3==2.9.1
+pycryptodome==3.19.0
+cryptography==41.0.7
+
+# Optional Mail Analysis Dependencies (install separately if needed)
+# email-validator==2.0.0
+# dnspython==2.4.2

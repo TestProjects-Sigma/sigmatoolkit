@@ -1,4 +1,4 @@
-# ui/main_window.py - UPDATED WITH PORT LISTENER
+# ui/main_window.py - UPDATED WITH AD PASSWORD CHECKER
 from PyQt5.QtWidgets import (QMainWindow, QTabWidget, QVBoxLayout, 
                             QWidget, QMenuBar, QAction, QMessageBox,
                             QSplitter, QTextEdit, QHBoxLayout, QPushButton,
@@ -10,6 +10,14 @@ from network.network_tab import NetworkTab
 from dns.dns_tab import DNSTab
 from smtp.smtp_tab import SMTPTab
 from speedtest.speedtest_tab import SpeedTestTab
+
+# Try to import the AD tab
+try:
+    from ad.ad_tab import ADPasswordTab
+    AD_TAB_AVAILABLE = True
+except ImportError:
+    AD_TAB_AVAILABLE = False
+    print("⚠️ AD Password Checker tab not available - create ad module first")
 
 # Try to import the port listener tab
 try:
@@ -41,8 +49,17 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         # Update version based on available features
-        version_base = "1.5.0" if SERVICES_TAB_AVAILABLE else ("1.4.0" if MAIL_TAB_AVAILABLE else "1.3.0")
-        self.version = f"{version_base}.1" if PORT_LISTENER_TAB_AVAILABLE else version_base
+        version_base = "1.6.0" if AD_TAB_AVAILABLE else ("1.5.0" if SERVICES_TAB_AVAILABLE else ("1.4.0" if MAIL_TAB_AVAILABLE else "1.3.0"))
+        
+        # Add sub-version indicators for additional features
+        sub_features = []
+        if PORT_LISTENER_TAB_AVAILABLE:
+            sub_features.append("1")
+        if len(sub_features) > 0:
+            self.version = f"{version_base}.{'.'.join(sub_features)}"
+        else:
+            self.version = version_base
+            
         self.logger = Logger()
         self.init_ui()
         
@@ -62,6 +79,18 @@ class MainWindow(QMainWindow):
         
         # Create tab widget
         self.tab_widget = QTabWidget()
+        
+        # Add tabs in order of importance/usage
+        
+        # Add Service Monitor tab first (most important for infrastructure monitoring)
+        if SERVICES_TAB_AVAILABLE:
+            self.services_tab = ServiceMonitorTab(self.logger)
+            self.tab_widget.addTab(self.services_tab, "🟢 Service Monitor")
+        
+        # Add AD Password Checker tab (NEW - high priority for security)
+        if AD_TAB_AVAILABLE:
+            self.ad_tab = ADPasswordTab(self.logger)
+            self.tab_widget.addTab(self.ad_tab, "🔐 AD Password Checker")
              
         # Add Network tab
         self.network_tab = NetworkTab(self.logger)
@@ -70,17 +99,12 @@ class MainWindow(QMainWindow):
         # Add DNS tab
         self.dns_tab = DNSTab(self.logger)
         self.tab_widget.addTab(self.dns_tab, "🔍 DNS Testing")
-
-        # Add Service Monitor tab
-        if SERVICES_TAB_AVAILABLE:
-            self.services_tab = ServiceMonitorTab(self.logger)
-            self.tab_widget.addTab(self.services_tab, "🟢 Service Monitor")
         
         # Add SMTP tab
         self.smtp_tab = SMTPTab(self.logger)
         self.tab_widget.addTab(self.smtp_tab, "📧 SMTP Testing")
         
-        # Add Port Listener tab (NEW)
+        # Add Port Listener tab
         if PORT_LISTENER_TAB_AVAILABLE:
             self.port_listener_tab = PortListenerTab(self.logger)
             self.tab_widget.addTab(self.port_listener_tab, "🔌 Port Listener")
@@ -111,10 +135,14 @@ class MainWindow(QMainWindow):
         self.debug_btn = QPushButton("Toggle Debug")
         self.debug_btn.setCheckable(True)
         
-        # Add export button for service reports
+        # Add export buttons for different modules
         if SERVICES_TAB_AVAILABLE:
             self.export_services_btn = QPushButton("Export Service Report")
             controls_layout.addWidget(self.export_services_btn)
+            
+        if AD_TAB_AVAILABLE:
+            self.export_ad_btn = QPushButton("Export AD Report")
+            controls_layout.addWidget(self.export_ad_btn)
         
         # Style the control buttons
         button_style = """
@@ -143,6 +171,9 @@ class MainWindow(QMainWindow):
         
         if SERVICES_TAB_AVAILABLE:
             self.export_services_btn.setStyleSheet(button_style)
+            
+        if AD_TAB_AVAILABLE:
+            self.export_ad_btn.setStyleSheet(button_style)
         
         controls_layout.addWidget(self.clear_btn)
         controls_layout.addWidget(self.copy_btn)
@@ -213,14 +244,15 @@ class MainWindow(QMainWindow):
         """Delayed welcome message"""
         self.logger.info(f"🎉 Welcome to SigmaToolkit v{self.version}!")
         
+        if AD_TAB_AVAILABLE:
+            self.logger.info("🔐 NEW: AD Password Checker for Active Directory security compliance")
+            self.logger.info("🛡️ Monitor password expiry, enforce policies, and maintain security standards")
+        
         if PORT_LISTENER_TAB_AVAILABLE:
-            self.logger.info("🔌 NEW: Port Listener tab for firewall testing and connection monitoring")
-            self.logger.info("⚡ Test firewall ports, monitor connections, and validate network access")
+            self.logger.info("🔌 Port Listener for firewall testing and connection monitoring")
         
         if SERVICES_TAB_AVAILABLE:
             self.logger.info("🟢 Service Monitor: Microsoft 365, cloud services, and custom monitoring")
-            self.logger.info("📊 Monitor Microsoft 365, Google Workspace, AWS, Azure, and custom services")
-            self.logger.info("🔄 Auto-refresh, real-time status, and comprehensive health checks")
         
         if MAIL_TAB_AVAILABLE:
             self.logger.info("📨 Mail Header Analysis: SPF/DKIM/DMARC, delivery paths, and spam detection")
@@ -233,6 +265,8 @@ class MainWindow(QMainWindow):
         
         if SERVICES_TAB_AVAILABLE:
             tabs.append("Service Monitor")
+        if AD_TAB_AVAILABLE:
+            tabs.append("AD Security")
         tabs.extend(["Network", "DNS", "SMTP"])
         if PORT_LISTENER_TAB_AVAILABLE:
             tabs.append("Port Listener")
@@ -243,7 +277,7 @@ class MainWindow(QMainWindow):
         toolkit_description += " → ".join(tabs)
         self.logger.info(toolkit_description)
             
-        self.logger.info("💡 Ready for comprehensive IT infrastructure monitoring and testing!")
+        self.logger.info("💡 Ready for comprehensive IT infrastructure monitoring, security compliance, and testing!")
         
     def setup_connections(self):
         self.clear_btn.clicked.connect(self.clear_output)
@@ -252,6 +286,9 @@ class MainWindow(QMainWindow):
         
         if SERVICES_TAB_AVAILABLE:
             self.export_services_btn.clicked.connect(self.export_service_report)
+            
+        if AD_TAB_AVAILABLE:
+            self.export_ad_btn.clicked.connect(self.export_ad_report)
         
     def setup_menu(self):
         menubar = self.menuBar()
@@ -269,6 +306,17 @@ class MainWindow(QMainWindow):
             file_menu.addAction(save_services_action)
             
             file_menu.addSeparator()
+            
+        if AD_TAB_AVAILABLE:
+            load_ad_action = QAction('Load AD Config', self)
+            load_ad_action.triggered.connect(self.load_ad_config)
+            file_menu.addAction(load_ad_action)
+            
+            save_ad_action = QAction('Save AD Config', self)
+            save_ad_action.triggered.connect(self.save_ad_config)
+            file_menu.addAction(save_ad_action)
+            
+            file_menu.addSeparator()
         
         exit_action = QAction('Exit', self)
         exit_action.setShortcut('Ctrl+Q')
@@ -280,27 +328,36 @@ class MainWindow(QMainWindow):
         
         if SERVICES_TAB_AVAILABLE:
             service_monitor_action = QAction('Service Monitor', self)
-            service_monitor_action.triggered.connect(lambda: self.tab_widget.setCurrentIndex(2))
+            tab_index = 0  # Services is first tab
+            service_monitor_action.triggered.connect(lambda: self.tab_widget.setCurrentIndex(tab_index))
             tools_menu.addAction(service_monitor_action)
+            tools_menu.addSeparator()
+            
+        if AD_TAB_AVAILABLE:
+            ad_password_action = QAction('AD Password Checker', self)
+            tab_index = 1 if SERVICES_TAB_AVAILABLE else 0
+            ad_password_action.triggered.connect(lambda: self.tab_widget.setCurrentIndex(tab_index))
+            tools_menu.addAction(ad_password_action)
             tools_menu.addSeparator()
         
         # Add Port Listener menu item
         if PORT_LISTENER_TAB_AVAILABLE:
             port_listener_action = QAction('Port Listener', self)
             # Calculate the correct tab index based on available tabs
-            tab_index = 3  # Default position (Network, DNS, SMTP, Port Listener)
+            tab_index = 2  # Default position
             if SERVICES_TAB_AVAILABLE:
-                tab_index = 4  # (Network, DNS, Services, SMTP, Port Listener)
+                tab_index += 1
+            if AD_TAB_AVAILABLE:
+                tab_index += 1
+            tab_index += 2  # Skip Network and DNS
             port_listener_action.triggered.connect(lambda: self.tab_widget.setCurrentIndex(tab_index))
             tools_menu.addAction(port_listener_action)
             tools_menu.addSeparator()
         
         if MAIL_TAB_AVAILABLE:
             mail_analysis_action = QAction('Mail Header Analysis', self)
-            # Calculate correct tab index for mail tab
-            tab_index = 5 if SERVICES_TAB_AVAILABLE else 4
-            if PORT_LISTENER_TAB_AVAILABLE:
-                tab_index += 1
+            # Calculate correct tab index for mail tab (last tab)
+            tab_index = self.tab_widget.count() - 1
             mail_analysis_action.triggered.connect(lambda: self.tab_widget.setCurrentIndex(tab_index))
             tools_menu.addAction(mail_analysis_action)
             tools_menu.addSeparator()
@@ -315,6 +372,11 @@ class MainWindow(QMainWindow):
         about_action = QAction('About', self)
         about_action.triggered.connect(self.show_about)
         help_menu.addAction(about_action)
+        
+        if AD_TAB_AVAILABLE:
+            ad_help_action = QAction('AD Password Checker Help', self)
+            ad_help_action.triggered.connect(self.show_ad_help)
+            help_menu.addAction(ad_help_action)
         
         if PORT_LISTENER_TAB_AVAILABLE:
             port_help_action = QAction('Port Listener Help', self)
@@ -375,6 +437,31 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.logger.error(f"Export service report failed: {str(e)}")
             
+    def export_ad_report(self):
+        """Export AD password report"""
+        if not AD_TAB_AVAILABLE:
+            return
+            
+        try:
+            if not self.ad_tab.users_data:
+                QMessageBox.information(self, "No Data", "No AD data to export. Please refresh AD data first.")
+                return
+                
+            file_path, _ = QFileDialog.getSaveFileName(
+                self, 
+                "Export AD Password Report", 
+                f"ad_password_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv", 
+                "CSV Files (*.csv);;Text Files (*.txt);;All Files (*)"
+            )
+            
+            if file_path:
+                # Use the AD tab's export functionality
+                self.ad_tab.export_data()
+                self.logger.success(f"AD password report exported")
+                    
+        except Exception as e:
+            self.logger.error(f"Export AD report failed: {str(e)}")
+            
     def load_service_config(self):
         """Load service configuration from file"""
         if not SERVICES_TAB_AVAILABLE:
@@ -421,6 +508,26 @@ class MainWindow(QMainWindow):
                     
         except Exception as e:
             self.logger.error(f"Save service config failed: {str(e)}")
+            
+    def load_ad_config(self):
+        """Load AD configuration from file"""
+        if not AD_TAB_AVAILABLE:
+            return
+            
+        try:
+            self.ad_tab.load_configuration()
+        except Exception as e:
+            self.logger.error(f"Load AD config failed: {str(e)}")
+            
+    def save_ad_config(self):
+        """Save AD configuration to file"""
+        if not AD_TAB_AVAILABLE:
+            return
+            
+        try:
+            self.ad_tab.save_configuration()
+        except Exception as e:
+            self.logger.error(f"Save AD config failed: {str(e)}")
         
     def export_all_results(self):
         """Export all results from all tabs"""
@@ -447,6 +554,18 @@ class MainWindow(QMainWindow):
                         f.write(f"Healthy: {summary['healthy']}\n")
                         f.write(f"Warning: {summary['warning']}\n")
                         f.write(f"Critical: {summary['critical']}\n\n")
+                        
+                    # Export AD status if available
+                    if AD_TAB_AVAILABLE and self.ad_tab.users_data:
+                        f.write("AD PASSWORD STATUS SUMMARY:\n")
+                        f.write("-" * 30 + "\n")
+                        summary = self.ad_tab.ad_tools.get_status_summary(self.ad_tab.users_data)
+                        f.write(f"Total Users: {summary['total']}\n")
+                        f.write(f"Expired: {summary['expired']}\n")
+                        f.write(f"Expiring Soon: {summary['expiring_soon']}\n")
+                        f.write(f"Active: {summary['active']}\n")
+                        f.write(f"Never Expires: {summary['never_expires']}\n")
+                        f.write(f"Disabled: {summary['disabled']}\n\n")
                     
                     # Export port listener stats if available
                     if PORT_LISTENER_TAB_AVAILABLE and hasattr(self, 'port_listener_tab'):
@@ -471,12 +590,16 @@ class MainWindow(QMainWindow):
             self.logger.error(f"Export failed: {str(e)}")
         
     def show_about(self):
-        features_text = """• Port Listener (Firewall Testing, Connection Monitoring, Network Validation)
+        features_text = """• AD Password Checker (Active Directory Security, Password Expiry Monitoring, Compliance Reporting)
 • Service Monitor (Microsoft 365, Google Workspace, AWS, Azure, Custom Services)
 • Network Testing (Ping, Traceroute, Port Scan)
 • DNS Testing (Forward/Reverse, MX, SPF, TXT, NS, CNAME, AAAA)
 • SMTP Testing (Connection, Auth, Email Sending, MX Validation)
 • Speed Testing (Internet, LAN, Latency, Real-time Monitoring)"""
+
+        if PORT_LISTENER_TAB_AVAILABLE:
+            features_text += """
+• Port Listener (Firewall Testing, Connection Monitoring, Network Validation)"""
 
         if MAIL_TAB_AVAILABLE:
             features_text += """
@@ -485,7 +608,8 @@ class MainWindow(QMainWindow):
         features_text += """
 • Debug logging and easy result copying"""
 
-        version_history = """v1.5.1 - Added Port Listener for firewall testing and connection monitoring
+        version_history = """v1.6.0 - Added comprehensive Active Directory password expiry monitoring and security compliance
+v1.5.1 - Added Port Listener for firewall testing and connection monitoring
 v1.5.0 - Added comprehensive service monitoring with Microsoft 365, cloud providers, and custom services
 v1.4.0 - Added comprehensive mail header analysis and email authentication
 v1.3.0 - Added comprehensive speed testing with real-time displays
@@ -494,6 +618,9 @@ v1.1.0 - Added DNS testing capabilities
 v1.0.0 - Initial release with network tools"""
 
         # Filter version history based on available features
+        if not AD_TAB_AVAILABLE:
+            version_history = version_history.replace("v1.6.0 - Added comprehensive Active Directory password expiry monitoring and security compliance\n", "")
+
         if not PORT_LISTENER_TAB_AVAILABLE:
             version_history = version_history.replace("v1.5.1 - Added Port Listener for firewall testing and connection monitoring\n", "")
 
@@ -507,10 +634,96 @@ v1.0.0 - Initial release with network tools"""
                          f"SigmaToolkit v{self.version}\n\n"
                          "Sigma's IT Swiss Army Knife\n"
                          "A comprehensive tool for system administrators\n"
-                         "to perform infrastructure monitoring, network, DNS, email, speed, and mail diagnostics.\n\n"
+                         "to perform infrastructure monitoring, security compliance, network, DNS, email, speed, and mail diagnostics.\n\n"
                          f"Features:\n{features_text}\n\n"
                          f"Version History:\n{version_history}\n\n"
-                         "Created for efficient IT troubleshooting and infrastructure monitoring workflows.")
+                         "Created for efficient IT troubleshooting, security compliance, and infrastructure monitoring workflows.")
+    
+    def show_ad_help(self):
+        """Show help for AD Password Checker features"""
+        if not AD_TAB_AVAILABLE:
+            QMessageBox.information(self, "AD Password Checker Not Available", 
+                                  "The AD Password Checker feature is not currently available.\n\n"
+                                  "To enable this feature:\n"
+                                  "1. Create the ad module directory\n"
+                                  "2. Add the ad_tab.py and ad_tools.py files\n"
+                                  "3. Install required dependencies: pip install ldap3 pycryptodome\n"
+                                  "4. Restart SigmaToolkit\n\n"
+                                  "The AD Password Checker provides comprehensive Active Directory "
+                                  "password monitoring and security compliance features.")
+            return
+            
+        help_text = """🔐 AD PASSWORD CHECKER HELP
+
+The AD Password Checker provides comprehensive Active Directory password monitoring and security compliance:
+
+🛡️ SECURITY FEATURES:
+• LDAP over SSL/TLS (LDAPS) with strong cipher suites
+• NTLM authentication for Windows Active Directory
+• Certificate validation for secure connections
+• No sensitive data storage - passwords never saved to config files
+• Multiple authentication methods with automatic fallback
+
+📊 PASSWORD MONITORING:
+• Real-time password expiration tracking with exact day counts
+• Visual indicators for expired (red) and expiring soon (yellow) passwords
+• Handles special cases: "Password never expires" and disabled accounts
+• Sortable data table with comprehensive user information
+• Auto-refresh capability with configurable intervals
+
+🔧 CONFIGURATION:
+• Server: Your AD domain controller (dc01.company.com)
+• Port: 636 (SSL) or 389 (non-SSL) - SSL recommended
+• Domain: Your Windows domain name (COMPANY)
+• Base DN: LDAP search base (DC=company,DC=com)
+• Service Account: AD account with read permissions
+
+📈 MONITORING DASHBOARD:
+• 🔴 Expired Passwords: Immediate attention required
+• 🟡 Expiring Soon: Passwords expiring within 7 days
+• ✅ Active: Passwords in good standing
+• ♾️ Never Expires: Accounts with non-expiring passwords
+• ❌ Disabled: Disabled user accounts
+
+📋 REPORTING FEATURES:
+• Summary Report: Comprehensive password status overview
+• Export to CSV: Detailed user data for external analysis
+• Configuration Management: Save/load AD connection settings
+• Status Dashboards: Real-time monitoring displays
+
+🛠️ INTEGRATION CAPABILITIES:
+• Standalone application for immediate use
+• API class for integration with existing applications
+• Clean OOP structure for maintainability
+• Threaded operations to prevent UI blocking
+
+💡 BEST PRACTICES:
+• Use dedicated service account with minimal permissions
+• Always use SSL/TLS (port 636) in production environments
+• Monitor expired passwords daily
+• Set up auto-refresh for continuous monitoring
+• Export reports for compliance documentation
+• Review accounts that never expire for security compliance
+
+🔒 SECURITY REQUIREMENTS:
+• Service account needs read access to user objects
+• No administrator privileges required
+• Network access to AD domain controller
+• Firewall rules allowing LDAP/LDAPS traffic
+
+⚙️ TROUBLESHOOTING:
+• Test connection before first use
+• Verify service account credentials
+• Check network connectivity to domain controller
+• Ensure proper Base DN configuration
+• Monitor LDAP server logs for authentication issues"""
+        
+        msg = QMessageBox()
+        msg.setWindowTitle("AD Password Checker Help")
+        msg.setText("AD Password Checker Help")
+        msg.setDetailedText(help_text)
+        msg.setIcon(QMessageBox.Information)
+        msg.exec_()
     
     def show_port_listener_help(self):
         """Show help for port listener features"""
