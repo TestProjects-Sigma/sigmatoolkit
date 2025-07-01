@@ -41,14 +41,16 @@ class ADPasswordTab(BaseTab):
     def init_ui(self):
         """Initialize the UI layout"""
         layout = QVBoxLayout()
+        layout.setSpacing(5)  # Reduce spacing between elements
+        layout.setContentsMargins(5, 5, 5, 5)  # Reduce margins
         
-        # Header
-        header = QLabel("🔐 Active Directory Password Expiry Checker")
-        header.setFont(QFont("Arial", 14, QFont.Bold))
-        header.setStyleSheet("color: #0078d4; padding: 10px;")
-        layout.addWidget(header)
+        # More compact header or remove it entirely
+        # header = QLabel("🔐 AD Password Checker")
+        # header.setFont(QFont("Arial", 10, QFont.Bold))
+        # header.setStyleSheet("color: #0078d4; padding: 2px; margin: 0px;")
+        # layout.addWidget(header)
         
-        # Create main splitter
+        # Create main splitter without header
         splitter = QSplitter(Qt.Horizontal)
         
         # Left panel - Configuration
@@ -68,10 +70,14 @@ class ADPasswordTab(BaseTab):
         """Create the configuration panel"""
         config_widget = QWidget()
         layout = QVBoxLayout()
+        layout.setSpacing(8)  # Reduce spacing between groups
+        layout.setContentsMargins(5, 5, 5, 5)  # Reduce margins
         
-        # Connection Settings Group
+        # Connection Settings Group - more compact
         conn_group = QGroupBox("🌐 Connection Settings")
+        conn_group.setStyleSheet("QGroupBox { font-weight: bold; padding-top: 10px; }")
         conn_layout = QFormLayout()
+        conn_layout.setVerticalSpacing(6)  # Reduce spacing between form rows
         
         self.server_edit = QLineEdit()
         self.server_edit.setPlaceholderText("dc01.company.com")
@@ -106,9 +112,11 @@ class ADPasswordTab(BaseTab):
         
         conn_group.setLayout(conn_layout)
         
-        # Application Settings Group
+        # Application Settings Group - more compact
         app_group = QGroupBox("⚙️ Application Settings")
+        app_group.setStyleSheet("QGroupBox { font-weight: bold; padding-top: 10px; }")
         app_layout = QFormLayout()
+        app_layout.setVerticalSpacing(6)  # Reduce spacing between form rows
         
         self.auto_refresh_check = QCheckBox("Auto Refresh")
         self.refresh_interval_spin = QSpinBox()
@@ -127,8 +135,9 @@ class ADPasswordTab(BaseTab):
         
         app_group.setLayout(app_layout)
         
-        # Control Buttons
+        # Control Buttons - more compact
         button_layout = QVBoxLayout()
+        button_layout.setSpacing(4)  # Reduce spacing between buttons
         
         self.test_btn = QPushButton("🔍 Test Connection")
         self.save_config_btn = QPushButton("💾 Save Configuration")
