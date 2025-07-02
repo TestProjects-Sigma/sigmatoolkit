@@ -1,4 +1,4 @@
-# ui/main_window.py - UPDATED WITH AD PASSWORD CHECKER
+# ui/main_window.py - UPDATED WITH FOLDER PERMISSIONS ANALYZER v1.7.0
 from PyQt5.QtWidgets import (QMainWindow, QTabWidget, QVBoxLayout, 
                             QWidget, QMenuBar, QAction, QMessageBox,
                             QSplitter, QTextEdit, QHBoxLayout, QPushButton,
@@ -18,6 +18,14 @@ try:
 except ImportError:
     AD_TAB_AVAILABLE = False
     print("⚠️ AD Password Checker tab not available - create ad module first")
+
+# Try to import the folder permissions tab
+try:
+    from file_folder_permissions.permissions_tab import PermissionsTab
+    PERMISSIONS_TAB_AVAILABLE = True
+except ImportError:
+    PERMISSIONS_TAB_AVAILABLE = False
+    print("⚠️ Folder Permissions tab not available - create file_folder_permissions module first")
 
 # Try to import the port listener tab
 try:
@@ -49,7 +57,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         # Update version based on available features
-        version_base = "1.6.0" if AD_TAB_AVAILABLE else ("1.5.0" if SERVICES_TAB_AVAILABLE else ("1.4.0" if MAIL_TAB_AVAILABLE else "1.3.0"))
+        version_base = "1.7.0" if PERMISSIONS_TAB_AVAILABLE else ("1.6.0" if AD_TAB_AVAILABLE else ("1.5.0" if SERVICES_TAB_AVAILABLE else ("1.4.0" if MAIL_TAB_AVAILABLE else "1.3.0")))
         
         # Add sub-version indicators for additional features
         sub_features = []
@@ -87,10 +95,15 @@ class MainWindow(QMainWindow):
             self.services_tab = ServiceMonitorTab(self.logger)
             self.tab_widget.addTab(self.services_tab, "🟢 Service Monitor")
         
-        # Add AD Password Checker tab (NEW - high priority for security)
+        # Add AD Password Checker tab (high priority for security)
         if AD_TAB_AVAILABLE:
             self.ad_tab = ADPasswordTab(self.logger)
             self.tab_widget.addTab(self.ad_tab, "🔐 AD Password Checker")
+
+        # Add Folder Permissions Analyzer tab (NEW - security compliance)
+        if PERMISSIONS_TAB_AVAILABLE:
+            self.permissions_tab = PermissionsTab(self.logger)
+            self.tab_widget.addTab(self.permissions_tab, "📁 Folder Permissions")
              
         # Add Network tab
         self.network_tab = NetworkTab(self.logger)
@@ -143,6 +156,10 @@ class MainWindow(QMainWindow):
         if AD_TAB_AVAILABLE:
             self.export_ad_btn = QPushButton("Export AD Report")
             controls_layout.addWidget(self.export_ad_btn)
+
+        if PERMISSIONS_TAB_AVAILABLE:
+            self.export_permissions_btn = QPushButton("Export Permissions Report")
+            controls_layout.addWidget(self.export_permissions_btn)
         
         # Style the control buttons
         button_style = """
@@ -174,6 +191,9 @@ class MainWindow(QMainWindow):
             
         if AD_TAB_AVAILABLE:
             self.export_ad_btn.setStyleSheet(button_style)
+
+        if PERMISSIONS_TAB_AVAILABLE:
+            self.export_permissions_btn.setStyleSheet(button_style)
         
         controls_layout.addWidget(self.clear_btn)
         controls_layout.addWidget(self.copy_btn)
@@ -244,8 +264,12 @@ class MainWindow(QMainWindow):
         """Delayed welcome message"""
         self.logger.info(f"🎉 Welcome to SigmaToolkit v{self.version}!")
         
+        if PERMISSIONS_TAB_AVAILABLE:
+            self.logger.info("📁 NEW: Folder Permissions Analyzer for NTFS security compliance")
+            self.logger.info("🔐 Analyze AD groups, scan network shares, and audit folder access permissions")
+        
         if AD_TAB_AVAILABLE:
-            self.logger.info("🔐 NEW: AD Password Checker for Active Directory security compliance")
+            self.logger.info("🔐 AD Password Checker for Active Directory security compliance")
             self.logger.info("🛡️ Monitor password expiry, enforce policies, and maintain security standards")
         
         if PORT_LISTENER_TAB_AVAILABLE:
@@ -267,6 +291,8 @@ class MainWindow(QMainWindow):
             tabs.append("Service Monitor")
         if AD_TAB_AVAILABLE:
             tabs.append("AD Security")
+        if PERMISSIONS_TAB_AVAILABLE:
+            tabs.append("Folder Permissions")
         tabs.extend(["Network", "DNS", "SMTP"])
         if PORT_LISTENER_TAB_AVAILABLE:
             tabs.append("Port Listener")
@@ -289,6 +315,9 @@ class MainWindow(QMainWindow):
             
         if AD_TAB_AVAILABLE:
             self.export_ad_btn.clicked.connect(self.export_ad_report)
+
+        if PERMISSIONS_TAB_AVAILABLE:
+            self.export_permissions_btn.clicked.connect(self.export_permissions_report)
         
     def setup_menu(self):
         menubar = self.menuBar()
@@ -339,17 +368,29 @@ class MainWindow(QMainWindow):
             ad_password_action.triggered.connect(lambda: self.tab_widget.setCurrentIndex(tab_index))
             tools_menu.addAction(ad_password_action)
             tools_menu.addSeparator()
+
+        if PERMISSIONS_TAB_AVAILABLE:
+            permissions_action = QAction('Folder Permissions Analyzer', self)
+            tab_index = 0
+            if SERVICES_TAB_AVAILABLE:
+                tab_index += 1
+            if AD_TAB_AVAILABLE:
+                tab_index += 1
+            permissions_action.triggered.connect(lambda: self.tab_widget.setCurrentIndex(tab_index))
+            tools_menu.addAction(permissions_action)
+            tools_menu.addSeparator()
         
         # Add Port Listener menu item
         if PORT_LISTENER_TAB_AVAILABLE:
             port_listener_action = QAction('Port Listener', self)
             # Calculate the correct tab index based on available tabs
-            tab_index = 2  # Default position
+            tab_index = 3  # Default position after Network, DNS, SMTP
             if SERVICES_TAB_AVAILABLE:
                 tab_index += 1
             if AD_TAB_AVAILABLE:
                 tab_index += 1
-            tab_index += 2  # Skip Network and DNS
+            if PERMISSIONS_TAB_AVAILABLE:
+                tab_index += 1
             port_listener_action.triggered.connect(lambda: self.tab_widget.setCurrentIndex(tab_index))
             tools_menu.addAction(port_listener_action)
             tools_menu.addSeparator()
@@ -377,6 +418,11 @@ class MainWindow(QMainWindow):
             ad_help_action = QAction('AD Password Checker Help', self)
             ad_help_action.triggered.connect(self.show_ad_help)
             help_menu.addAction(ad_help_action)
+
+        if PERMISSIONS_TAB_AVAILABLE:
+            permissions_help_action = QAction('Folder Permissions Help', self)
+            permissions_help_action.triggered.connect(self.show_permissions_help)
+            help_menu.addAction(permissions_help_action)
         
         if PORT_LISTENER_TAB_AVAILABLE:
             port_help_action = QAction('Port Listener Help', self)
@@ -461,6 +507,39 @@ class MainWindow(QMainWindow):
                     
         except Exception as e:
             self.logger.error(f"Export AD report failed: {str(e)}")
+
+    def export_permissions_report(self):
+        """Export folder permissions report"""
+        if not PERMISSIONS_TAB_AVAILABLE:
+            return
+            
+        try:
+            if not self.permissions_tab.permissions_data:
+                QMessageBox.information(self, "No Data", "No permissions data to export. Please run a folder scan first.")
+                return
+                
+            file_path, _ = QFileDialog.getSaveFileName(
+                self, 
+                "Export Folder Permissions Report", 
+                f"folder_permissions_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv", 
+                "CSV Files (*.csv);;JSON Files (*.json);;All Files (*)"
+            )
+            
+            if file_path:
+                if file_path.lower().endswith('.json'):
+                    success = self.permissions_tab.permissions_tools.export_to_json(
+                        self.permissions_tab.permissions_data, file_path)
+                else:
+                    success = self.permissions_tab.permissions_tools.export_to_csv(
+                        self.permissions_tab.permissions_data, file_path)
+                
+                if success:
+                    self.logger.success(f"Folder permissions report exported to: {file_path}")
+                else:
+                    self.logger.error("Failed to export permissions report")
+                    
+        except Exception as e:
+            self.logger.error(f"Export permissions report failed: {str(e)}")
             
     def load_service_config(self):
         """Load service configuration from file"""
@@ -566,6 +645,20 @@ class MainWindow(QMainWindow):
                         f.write(f"Active: {summary['active']}\n")
                         f.write(f"Never Expires: {summary['never_expires']}\n")
                         f.write(f"Disabled: {summary['disabled']}\n\n")
+
+                    # Export permissions status if available
+                    if PERMISSIONS_TAB_AVAILABLE and self.permissions_tab.permissions_data:
+                        f.write("FOLDER PERMISSIONS SUMMARY:\n")
+                        f.write("-" * 30 + "\n")
+                        stats = self.permissions_tab.permissions_tools.get_summary_stats(
+                            self.permissions_tab.permissions_data)
+                        f.write(f"Total Entries: {stats['total_entries']}\n")
+                        f.write(f"Unique Paths: {stats['unique_paths']}\n")
+                        f.write(f"Unique Identities: {stats['unique_identities']}\n")
+                        f.write(f"AD Groups: {stats['ad_groups']}\n")
+                        f.write(f"Inherited Permissions: {stats['inherited_permissions']}\n")
+                        f.write(f"Explicit Permissions: {stats['explicit_permissions']}\n")
+                        f.write(f"Deny Permissions: {stats['deny_permissions']}\n\n")
                     
                     # Export port listener stats if available
                     if PORT_LISTENER_TAB_AVAILABLE and hasattr(self, 'port_listener_tab'):
@@ -590,7 +683,8 @@ class MainWindow(QMainWindow):
             self.logger.error(f"Export failed: {str(e)}")
         
     def show_about(self):
-        features_text = """• AD Password Checker (Active Directory Security, Password Expiry Monitoring, Compliance Reporting)
+        features_text = """• Folder Permissions Analyzer (NTFS Security, AD Groups, UNC Network Shares, Permission Auditing)
+• AD Password Checker (Active Directory Security, Password Expiry Monitoring, Compliance Reporting)
 • Service Monitor (Microsoft 365, Google Workspace, AWS, Azure, Custom Services)
 • Network Testing (Ping, Traceroute, Port Scan)
 • DNS Testing (Forward/Reverse, MX, SPF, TXT, NS, CNAME, AAAA)
@@ -608,7 +702,8 @@ class MainWindow(QMainWindow):
         features_text += """
 • Debug logging and easy result copying"""
 
-        version_history = """v1.6.0 - Added comprehensive Active Directory password expiry monitoring and security compliance
+        version_history = """v1.7.0 - Added comprehensive folder permissions analyzer for NTFS security auditing
+v1.6.0 - Added comprehensive Active Directory password expiry monitoring and security compliance
 v1.5.1 - Added Port Listener for firewall testing and connection monitoring
 v1.5.0 - Added comprehensive service monitoring with Microsoft 365, cloud providers, and custom services
 v1.4.0 - Added comprehensive mail header analysis and email authentication
@@ -618,6 +713,9 @@ v1.1.0 - Added DNS testing capabilities
 v1.0.0 - Initial release with network tools"""
 
         # Filter version history based on available features
+        if not PERMISSIONS_TAB_AVAILABLE:
+            version_history = version_history.replace("v1.7.0 - Added comprehensive folder permissions analyzer for NTFS security auditing\n", "")
+
         if not AD_TAB_AVAILABLE:
             version_history = version_history.replace("v1.6.0 - Added comprehensive Active Directory password expiry monitoring and security compliance\n", "")
 
@@ -638,6 +736,114 @@ v1.0.0 - Initial release with network tools"""
                          f"Features:\n{features_text}\n\n"
                          f"Version History:\n{version_history}\n\n"
                          "Created for efficient IT troubleshooting, security compliance, and infrastructure monitoring workflows.")
+    
+    def show_permissions_help(self):
+        """Show help for folder permissions analyzer features"""
+        if not PERMISSIONS_TAB_AVAILABLE:
+            QMessageBox.information(self, "Folder Permissions Analyzer Not Available", 
+                                  "The Folder Permissions Analyzer feature is not currently available.\n\n"
+                                  "To enable this feature:\n"
+                                  "1. Create the file_folder_permissions module directory\n"
+                                  "2. Add the permissions_tab.py and permissions_tools.py files\n"
+                                  "3. Restart SigmaToolkit\n\n"
+                                  "The Folder Permissions Analyzer provides comprehensive NTFS "
+                                  "permissions analysis and Active Directory security auditing.")
+            return
+            
+        help_text = """📁 FOLDER PERMISSIONS ANALYZER HELP
+
+The Folder Permissions Analyzer provides comprehensive NTFS permissions analysis and Active Directory security auditing:
+
+🔍 PERMISSION SCANNING:
+• Scan local folders and UNC network paths (\\\\server\\share\\folder)
+• Recursive subfolder scanning with progress tracking
+• Focus on directory permissions only (excludes files for performance)
+• Support for both standard and complex folder structures
+• Real-time scanning progress with detailed status updates
+
+👥 ACTIVE DIRECTORY INTEGRATION:
+• Automatically identifies AD groups vs local users with smart detection
+• Filter to show only Active Directory groups for security focus
+• Displays user-friendly permission types: Read, Write, Change, Delete, List
+• Shows inheritance status and Allow/Deny access types
+• Clean permission display with relevant security information
+
+📊 COMPREHENSIVE ANALYSIS:
+• Shows only relevant permission types for security auditing
+• Indicates inheritance status for compliance reporting
+• Real-time filtering and search capabilities across all data
+• Sortable columns for efficient data analysis
+• Permission summary statistics and reporting
+
+📤 FLEXIBLE EXPORT OPTIONS:
+• Export All to CSV: Complete scan results for compliance documentation
+• Export Selected to CSV: Export only selected table rows for focused analysis
+• Export to JSON: Machine-readable format for automation and integration
+• Timestamped filenames for easy organization and audit trails
+
+🎨 PROFESSIONAL INTERFACE:
+• Clean, modern interface designed for security professionals
+• Resizable columns with helpful tooltips for efficient workflow
+• Progress indication during scans with real-time status updates
+• Color-coded status updates and comprehensive error handling
+
+🔧 SCANNING CAPABILITIES:
+• Local Paths: C:\\Users\\Public\\Documents, C:\\Data\\Shares
+• UNC Network Paths: \\\\fileserver\\departments\\IT, \\\\nas\\backups
+• Mixed environments: Seamlessly handle both local and network storage
+• Large scale: Efficiently process thousands of folders and permissions
+
+📋 PERMISSION TYPES EXPLAINED:
+• Read: View folder contents and file properties
+• Write: Create new files and folders
+• Change: Modify existing files and folders (includes Write)
+• Delete: Remove files and folders
+• List: Browse folder contents and traverse directories
+
+🔐 SECURITY ANALYSIS:
+• Full Control → Displays as: "Read, Write, Change, Delete, List"
+• Modify → Displays as: "Read, Write, Change, Delete, List"
+• Read & Execute → Displays as: "Read, List"
+• Custom Permissions: Shows exact permission combinations
+
+🛠️ FILTERING & SEARCH:
+• Search Filter: Filter by identity name, path, or permission type
+• AD Groups Filter: Show only domain groups, hide local users
+• Real-time filtering: Instant results as you type
+• Column sorting: Click headers to sort by any column
+
+💡 BEST PRACTICES:
+• Start with root network shares for comprehensive auditing
+• Use "Show AD Groups Only" to focus on domain security
+• Export results regularly for compliance documentation
+• Run as Administrator for full access to all folders
+• Scan during off-peak hours for large network shares
+
+🔒 SECURITY CONSIDERATIONS:
+• Application requires read access to folder ACLs only
+• No modifications are made to any permissions or security settings
+• Network credentials use current user context for authentication
+• Export files contain sensitive permission information - handle securely
+
+⚙️ TROUBLESHOOTING:
+• "No Permissions Found": Run as Administrator or check path accessibility
+• "Path Syntax Error": Use proper Windows format (C:\\folder or \\\\server\\share)
+• Slow Scanning: Disable subfolders for faster scanning or scan specific subdirectories
+• Network Issues: Verify network connectivity and credentials for UNC paths
+
+🎯 USE CASES:
+• Security Auditing: Identify overprivileged accounts and excessive permissions
+• Compliance Reporting: Generate documentation for SOX, HIPAA, PCI-DSS audits
+• Access Reviews: Regular review of folder access for least privilege principles
+• Migration Planning: Document current permissions before system migrations
+• Incident Response: Quickly identify who has access to compromised folders"""
+        
+        msg = QMessageBox()
+        msg.setWindowTitle("Folder Permissions Analyzer Help")
+        msg.setText("Folder Permissions Analyzer Help")
+        msg.setDetailedText(help_text)
+        msg.setIcon(QMessageBox.Information)
+        msg.exec_()
     
     def show_ad_help(self):
         """Show help for AD Password Checker features"""
